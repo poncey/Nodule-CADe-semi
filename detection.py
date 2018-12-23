@@ -1,5 +1,4 @@
 # coding=utf-8
-
 import argparse
 import os
 import time
@@ -8,18 +7,16 @@ import detector.data as data
 from importlib import import_module
 import shutil
 from detector.utils import *
-import sys
-sys.path.append('../')
 from detector.split_combine import SplitComb
-
 import torch
 from torch.nn import DataParallel
 from torch.backends import cudnn
 from torch.utils.data import DataLoader
-from torch import optim
 from torch.autograd import Variable
 from detector.config_detector import config as config_detector
 from detector.layers import acc
+import sys
+sys.path.append('../')
 
 parser = argparse.ArgumentParser(description='PyTorch DataBowl3 Detector')
 parser.add_argument('--model', '-m', metavar='MODEL', default='base',
@@ -53,14 +50,14 @@ parser.add_argument('--gpu', default='all', type=str, metavar='N',
 parser.add_argument('--n_test', default=1, type=int, metavar='N',
                     help='number of gpu for test')
 
-#eps=100
-#CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8 python main.py --model res18 -b 32 --epochs $eps --save-dir res18 
-#训练detector时，使用的模型是res18，batch size是32，epoch=100，训练完毕后的模型参数保存在res18文件夹内。
+# eps=100
+# CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8 python main.py --model res18 -b 32 --epochs $eps --save-dir res18
+# 训练detector时，使用的模型是res18，batch size是32，epoch=100，训练完毕后的模型参数保存在res18文件夹内。
+
 
 def main():
     global args
     args = parser.parse_args()
-    
     
     torch.manual_seed(0)
     torch.cuda.set_device(0)
@@ -86,16 +83,16 @@ def main():
             exp_id = time.strftime('%Y%m%d-%H%M%S', time.localtime())
             save_dir = os.path.join('results', args.model + '-' + exp_id)
         else:
-            save_dir = os.path.join('results',save_dir)
+            save_dir = os.path.join('results', save_dir)
     
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
-    logfile = os.path.join(save_dir,'log')
-    if args.test!=1:
+    logfile = os.path.join(save_dir, 'log')
+    if args.test != 1:
         sys.stdout = Logger(logfile)
         pyfiles = [f for f in os.listdir('./') if f.endswith('.py')]
         for f in pyfiles:
-            shutil.copy(f,os.path.join(save_dir,f))
+            shutil.copy(f, os.path.join(save_dir,f))
     n_gpu = setgpu(args.gpu)
     args.n_gpu = n_gpu
     net = net.cuda()
@@ -109,7 +106,7 @@ def main():
         margin = 32
         sidelen = 144
 
-        split_comber = SplitComb(sidelen,config['max_stride'],config['stride'],margin,config['pad_value'])
+        split_comber = SplitComb(sidelen, config['max_stride'], config['stride'], margin, config['pad_value'])
         dataset = data.DataBowl3Detector(
             datadir,
             'luna_file_id/file_id_test.npy',
@@ -118,46 +115,46 @@ def main():
             split_comber=split_comber)
         test_loader = DataLoader(
             dataset,
-            batch_size = 1, # 在测试阶段，batch size 固定为1
-            shuffle = False,
-            num_workers = args.workers,
-            collate_fn = data.collate,
+            batch_size=1,  # 在测试阶段，batch size 固定为1
+            shuffle=False,
+            num_workers=args.workers,
+            collate_fn=data.collate,
             pin_memory=False)
         
         test(test_loader, net, get_pbb, save_dir,config)
         return
 
-    #net = DataParallel(net)
+    # net = DataParallel(net)
     
     dataset = data.DataBowl3Detector(
         datadir,
         'luna_file_id/file_id_train.npy',
         config,
-        phase = 'train')
+        phase='train')
     train_loader = DataLoader(
         dataset,
-        batch_size = args.batch_size,
-        shuffle = True,
-        num_workers = args.workers,
+        batch_size=args.batch_size,
+        shuffle=True,
+        num_workers=args.workers,
         pin_memory=True)
 
     dataset = data.DataBowl3Detector(
         datadir,
         'luna_file_id/file_id_val.npy',
         config,
-        phase = 'val')
+        phase='val')
     val_loader = DataLoader(
         dataset,
-        batch_size = args.batch_size,
-        shuffle = False,
-        num_workers = args.workers,
+        batch_size=args.batch_size,
+        shuffle=False,
+        num_workers=args.workers,
         pin_memory=True)
 
     optimizer = torch.optim.SGD(
         net.parameters(),
         args.lr,
-        momentum = 0.9,
-        weight_decay = args.weight_decay)
+        momentum=0.9,
+        weight_decay=args.weight_decay)
     
     def get_lr(epoch):
         if epoch <= args.epochs * 0.5:
@@ -167,11 +164,11 @@ def main():
         else:
             lr = 0.01 * args.lr
         return lr
-    
 
     for epoch in range(start_epoch, args.epochs + 1):
         train(train_loader, net, loss, epoch, optimizer, get_lr, args.save_freq, save_dir)
         validate(val_loader, net, loss)
+
 
 def train(data_loader, net, loss, epoch, optimizer, get_lr, save_freq, save_dir):
     start_time = time.time()
@@ -183,19 +180,19 @@ def train(data_loader, net, loss, epoch, optimizer, get_lr, save_freq, save_dir)
 
     metrics = []
     for i, (data, target, coord) in enumerate(data_loader):
-        data = Variable(data.cuda(async = True))
-        target = Variable(target.cuda(async = True))
-        coord = Variable(coord.cuda(async = True))
+        data = Variable(data.cuda(async=True))
+        target = Variable(target.cuda(async=True))
+        coord = Variable(coord.cuda(async=True))
 
         output = net(data, coord)
-        loss_output = loss(output, target) # 损失函数返回的loss_output格式是[总的损失，分类损失，回归损失1,回归损失2,回归损失3,回归损失4，tp,tp+fn,tn,tn+fp]
-        optimizer.zero_grad() # 此处每个图块为RPN的一个batch，所以计算针对每个图块的loss时，都要先清空梯度，然后再反向传播、更新参数
+        loss_output = loss(output, target)  # 损失函数返回的loss_output格式是[总的损失，分类损失，回归损失1,回归损失2,回归损失3,回归损失4，tp,tp+fn,tn,tn+fp]
+        optimizer.zero_grad()  # 此处每个图块为RPN的一个batch，所以计算针对每个图块的loss时，都要先清空梯度，然后再反向传播、更新参数
         loss_output[0].backward()
         optimizer.step()
 
         loss_output[0] = loss_output[0].data[0]
-        metrics.append(loss_output) # metrics一个list，每个元素是一个图块的loss。总共图块数=所有结节数/0.7
-        #print('epoch = ',epoch,'    i = ',i,'    loss_output = ',loss_output)
+        metrics.append(loss_output)  # metrics一个list，每个元素是一个图块的loss。总共图块数=所有结节数/0.7
+        # print('epoch = ',epoch,'    i = ',i,'    loss_output = ',loss_output)
 
     if epoch % args.save_freq == 0:            
         state_dict = net.module.state_dict()
@@ -208,7 +205,7 @@ def train(data_loader, net, loss, epoch, optimizer, get_lr, save_freq, save_dir)
             'state_dict': state_dict,
             'args': args},
             os.path.join(save_dir, '%03d.ckpt' % epoch))
-        print('save path = ',os.path.join(save_dir, '%03d.ckpt' % epoch))
+        print('save path = ', os.path.join(save_dir, '%03d.ckpt' % epoch))
 
     end_time = time.time()
 
@@ -230,6 +227,7 @@ def train(data_loader, net, loss, epoch, optimizer, get_lr, save_freq, save_dir)
         np.mean(metrics[:, 5])))
     print
 
+
 def validate(data_loader, net, loss):
     start_time = time.time()
     
@@ -238,9 +236,9 @@ def validate(data_loader, net, loss):
     metrics = []
     for i, (data, target, coord) in enumerate(data_loader):
         with torch.no_grad():
-            data = Variable(data.cuda(async = True))#data = Variable(data.cuda(async = True), volatile = True)
-            target = Variable(target.cuda(async = True))#target = Variable(target.cuda(async = True), volatile = True)
-            coord = Variable(coord.cuda(async = True))#coord = Variable(coord.cuda(async = True), volatile = True)
+            data = Variable(data.cuda(async=True))  # data = Variable(data.cuda(async = True), volatile = True)
+            target = Variable(target.cuda(async=True))  # target = Variable(target.cuda(async = True), volatile = True)
+            coord = Variable(coord.cuda(async=True))  # coord = Variable(coord.cuda(async = True), volatile = True)
 
             output = net(data, coord)
             loss_output = loss(output, target, train = False)
@@ -266,13 +264,14 @@ def validate(data_loader, net, loss):
     print
     print
 
+
 def test(data_loader, net, get_pbb, save_dir, config):
     start_time = time.time()
     save_dir = os.path.join(save_dir,'bbox') # detector/results/res18/bbox
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     print(save_dir)
-    net.eval() # 把模型设置为评估模式，只对dropout、batch norm有影响
+    net.eval()  # 把模型设置为评估模式，只对dropout、batch norm有影响
     namelist = []
     split_comber = data_loader.dataset.split_comber
     for i_name, (data, target, coord, nzhw) in enumerate(data_loader):
@@ -289,20 +288,20 @@ def test(data_loader, net, get_pbb, save_dir, config):
         if 'output_feature' in config:
             if config['output_feature']:
                 isfeat = True
-        #print 'isfeat = ',isfeat
-        n_per_run = args.n_test # 测试时的gpu数量
-        print('data.size = ',data.size())
-        splitlist = range(0,len(data)+1,n_per_run)
-        if splitlist[-1]!=len(data):
+        # print 'isfeat = ',isfeat
+        n_per_run = args.n_test  # 测试时的gpu数量
+        print('data.size = ', data.size())
+        splitlist = range(0, len(data)+1,n_per_run)
+        if splitlist[-1] != len(data):
             splitlist.append(len(data))
         outputlist = []
         featurelist = []
         print('splitlist = ',splitlist)
 
         for i in range(len(splitlist)-1):
-            with torch.no_grad(): # 注意，只要是tensor参与计算的，如果不需要反向传播，就一定要将tensor放在torch.no_grad():区域内，以节省显存
-                input = Variable(data[splitlist[i]:splitlist[i+1]]).cuda()#input = Variable(data[splitlist[i]:splitlist[i+1]], volatile = True).cuda()
-                inputcoord = Variable(coord[splitlist[i]:splitlist[i+1]]).cuda()#inputcoord = Variable(coord[splitlist[i]:splitlist[i+1]], volatile = True).cuda()
+            with torch.no_grad():  # 注意，只要是tensor参与计算的，如果不需要反向传播，就一定要将tensor放在torch.no_grad():区域内，以节省显存
+                input = Variable(data[splitlist[i]:splitlist[i+1]]).cuda()  # input = Variable(data[splitlist[i]:splitlist[i+1]], volatile = True).cuda()
+                inputcoord = Variable(coord[splitlist[i]:splitlist[i+1]]).cuda()  # inputcoord = Variable(coord[splitlist[i]:splitlist[i+1]], volatile = True).cuda()
                 print('input.shape = ',input.shape,' inputcoord.shape = ',inputcoord.shape)
                 if isfeat:
                     output,feature = net(input,inputcoord)
@@ -312,59 +311,60 @@ def test(data_loader, net, get_pbb, save_dir, config):
                 outputlist.append(output.data.cpu().numpy())
         output = np.concatenate(outputlist,0)
         print('output.shape = ',output.shape)
-        #print('output = ',output)
+        # print('output = ',output)
         output = split_comber.combine(output,nzhw=nzhw) # 这里的返回值就是整个肺部扫描（抠出了肺部）所对应的完整bbox预测
-        #if isfeat:
+        # if isfeat:
             # 下面的语句都执行不到，应该是作者遗留下来的无用的语句。所以直接注释掉
-            #feature = np.concatenate(featurelist,0).transpose([0,2,3,4,1])[:,:,:,:,:,np.newaxis]
-            #feature = split_comber.combine(feature,sidelen)[...,0]
-            #print('sidelen = ',sidelen)
+            # feature = np.concatenate(featurelist,0).transpose([0,2,3,4,1])[:,:,:,:,:,np.newaxis]
+            # feature = split_comber.combine(feature,sidelen)[...,0]
+            # print('sidelen = ',sidelen)
 
         thresh = -3
-        pbb,mask = get_pbb(output,thresh,ismask=True) # pbb的形状为[-1,5]，因为使用了sigmoid(thresh)作为阈值进行了过滤，因此这里可以直接使用作者写好的nms函数进行去重，这里没有调用nms，应该是在分类的时候才进行了调用
-        print('pbb.shape = ',pbb.shape)
+        pbb,mask = get_pbb(output,thresh, ismask=True)  # pbb的形状为[-1,5]，因为使用了sigmoid(thresh)作为阈值进行了过滤，因此这里可以直接使用作者写好的nms函数进行去重，这里没有调用nms，应该是在分类的时候才进行了调用
+        print('pbb.shape = ', pbb.shape)
         if isfeat:
-            feature_selected = feature[mask[0],mask[1],mask[2]]
+            feature_selected = feature[mask[0], mask[1],mask[2]]
             np.save(os.path.join(save_dir, name+'_feature.npy'), feature_selected)
-        #tp,fp,fn,_ = acc(pbb,lbb,0,0.1,0.1)
-        #print([len(tp),len(fp),len(fn)])
-        print('iname,name = ',[i_name,name])
+        # tp,fp,fn,_ = acc(pbb,lbb,0,0.1,0.1)
+        # print([len(tp),len(fp),len(fn)])
+        print('iname,name = ', [i_name,name])
         e = time.time()
-        np.save(os.path.join(save_dir, name+'_pbb.npy'), pbb) # pbb的形状为[-1,5]，已经使用sigmoid(thresh)过滤了
-        np.save(os.path.join(save_dir, name+'_lbb.npy'), lbb) # lbb只是把人工标记给保存了起来
+        np.save(os.path.join(save_dir, name+'_pbb.npy'), pbb)  # pbb的形状为[-1,5]，已经使用sigmoid(thresh)过滤了
+        np.save(os.path.join(save_dir, name+'_lbb.npy'), lbb)  # lbb只是把人工标记给保存了起来
     np.save(os.path.join(save_dir, 'namelist.npy'), namelist)
     end_time = time.time()
-
 
     print('elapsed time is %3.2f seconds' % (end_time - start_time))
     print
     print
 
-def singletest(data,net,config,splitfun,combinefun,n_per_run,margin = 64,isfeat=False):
+
+def singletest(data, net, config, splitfun, combinefun, n_per_run, margin=64, isfeat=False):
     z, h, w = data.size(2), data.size(3), data.size(4)
     print(data.size())
     data = splitfun(data,config['max_stride'],margin)
-    data = Variable(data.cuda(async = True), volatile = True,requires_grad=False)
-    splitlist = range(0,args.split+1,n_per_run)
+    data = Variable(data.cuda(async=True), volatile=True, requires_grad=False)
+    splitlist = range(0,args.split+1, n_per_run)
     outputlist = []
     featurelist = []
     for i in range(len(splitlist)-1):
         if isfeat:
-            output,feature = net(data[splitlist[i]:splitlist[i+1]])
+            output, feature = net(data[splitlist[i]: splitlist[i+1]])
             featurelist.append(feature)
         else:
-            output = net(data[splitlist[i]:splitlist[i+1]])
+            output = net(data[splitlist[i]: splitlist[i+1]])
         output = output.data.cpu().numpy()
         outputlist.append(output)
         
-    output = np.concatenate(outputlist,0)
+    output = np.concatenate(outputlist, 0)
     output = combinefun(output, z / config['stride'], h / config['stride'], w / config['stride'])
     if isfeat:
-        feature = np.concatenate(featurelist,0).transpose([0,2,3,4,1])
+        feature = np.concatenate(featurelist, 0).transpose([0, 2, 3, 4, 1])
         feature = combinefun(feature, z / config['stride'], h / config['stride'], w / config['stride'])
-        return output,feature
+        return output, feature
     else:
         return output
+
+
 if __name__ == '__main__':
     main()
-
