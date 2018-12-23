@@ -4,7 +4,7 @@ detector/results
 detector/luna_file_id
 detector/labels
 .flag*
-.idea/
+.idea
 
 # Ignore some unused file
 *.pyc
