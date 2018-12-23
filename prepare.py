@@ -1,10 +1,7 @@
 # coding=utf-8
 import os
 import shutil
-import numpy as np
 from config_training import config
-
-
 from scipy.io import loadmat
 import numpy as np
 import h5py
@@ -20,8 +17,9 @@ from multiprocessing import Pool
 from functools import partial
 import sys
 sys.path.append('../preprocessing')
-#from step1 import step1_python
+from preprocessing.step1 import step1_python
 import warnings
+
 
 def resample(imgs, spacing, new_spacing,order=2): # 对图像进行重采样，使得单个像素长宽高为1*1*1毫米
     if len(imgs.shape)==3:
@@ -96,10 +94,10 @@ def savenpy(id,annos,filelist,data_path,prep_folder):# 这是针对DSB数据的�
     name = filelist[id]
     label = annos[annos[:,0]==name]
     label = label[:,[3,1,2,4]].astype('float')
-    
+
     im, m1, m2, spacing = step1_python(os.path.join(data_path,name))
     Mask = m1+m2
-    
+
     newshape = np.round(np.array(Mask.shape)*spacing/resolution)
     xx,yy,zz= np.where(Mask)
     box = np.array([[np.min(xx),np.max(xx)],[np.min(yy),np.max(yy)],[np.min(zz),np.max(zz)]])
@@ -131,7 +129,7 @@ def savenpy(id,annos,filelist,data_path,prep_folder):# 这是针对DSB数据的�
     sliceim = sliceim2[np.newaxis,...]
     np.save(os.path.join(prep_folder,name+'_clean.npy'),sliceim)
 
-    
+
     if len(label)==0:
         label2 = np.array([[0,0,0,0]])
     elif len(label[0])==0:
@@ -150,6 +148,7 @@ def savenpy(id,annos,filelist,data_path,prep_folder):# 这是针对DSB数据的�
 
     print(name)
 
+
 def full_prep(step1=True,step2 = True):
     warnings.filterwarnings("ignore")
 
@@ -157,7 +156,7 @@ def full_prep(step1=True,step2 = True):
     prep_folder = config['preprocess_result_path']
     data_path = config['stage1_data_path']
     finished_flag = '.flag_prepkaggle'
-    
+
     if not os.path.exists(finished_flag):
         alllabelfiles = config['stage1_annos_path']
         tmp = []
@@ -183,7 +182,7 @@ def full_prep(step1=True,step2 = True):
         pool.close()
         pool.join()
         print('end preprocessing')
-    f= open(finished_flag,"w+")        
+    f= open(finished_flag,"w+")
 
 def savenpy_luna(id,annos,filelist,luna_segment,luna_data,savepath):#将原始luna数据转换成numpy数组：分割出肺部然后保存为numpy数组，每个肺部扫描对应的结节也保存为numpy数组
     islabel = True

@@ -2,6 +2,8 @@
 
 import torch
 import numpy as np
+
+
 class SplitComb():
     def __init__(self,side_len,max_stride,stride,margin,pad_value):
         self.side_len = side_len # =144
@@ -11,11 +13,11 @@ class SplitComb():
         self.pad_value = pad_value # =170
         
     def split(self, data, side_len = None, max_stride = None, margin = None): # 将肺部扫描（抠出肺部之后的）分割为208*208*208的图块，每个图块重叠区域为32像素
-        if side_len==None:
+        if side_len is None:
             side_len = self.side_len
-        if max_stride == None:
+        if max_stride is None:
             max_stride = self.max_stride
-        if margin == None:
+        if margin is None:
             margin = self.margin
         
         assert(side_len > margin)
