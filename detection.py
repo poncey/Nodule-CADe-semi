@@ -4,13 +4,13 @@ import argparse
 import os
 import time
 import numpy as np
-import data
+import detector.data as data
 from importlib import import_module
 import shutil
-from utils import *
+from detector.utils import *
 import sys
 sys.path.append('../')
-from split_combine import SplitComb
+from detector.split_combine import SplitComb
 
 import torch
 from torch.nn import DataParallel
@@ -18,8 +18,8 @@ from torch.backends import cudnn
 from torch.utils.data import DataLoader
 from torch import optim
 from torch.autograd import Variable
-from config_detector import config as config_detector
-from layers import acc
+from detector.config_detector import config as config_detector
+from detector.layers import acc
 
 parser = argparse.ArgumentParser(description='PyTorch DataBowl3 Detector')
 parser.add_argument('--model', '-m', metavar='MODEL', default='base',

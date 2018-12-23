@@ -8,7 +8,7 @@ SimpleITK() numpy(1.14.3) matplotlib(2.2.2)  scikit-image(0.13.1) scipy(1.1.0) p
 ## Instruction for runing
 Training
 1. Install all dependencies
-2. Prepare stage1 data, LUNA data, and LUNA segment results [link here](https://luna16.grand-challenge.org/download/ “link here”), unzip them to separate folders
+2. Prepare stage1 data, LUNA data, and LUNA segment results [link here](https://luna16.grand-challenge.org/download/), unzip them to separate folders
 3. Go to ./training and open config_training.py
 4. Filling in stage1_data_path, luna_raw, luna_segment with the path mentioned above
 5. Filling in luna_data, preprocess_result_path, with tmp folders
@@ -23,7 +23,7 @@ Training
 
 ## Method introduction
 ### Dataset
-the LUng Nodule Analysis 2016 dataset (abbreviated as LUNA)are used to train the model.The LUNA dataset includes 1186 nodule labels in 888
+the Lung Nodule Analysis 2016 dataset (abbreviated as LUNA)are used to train the model.The LUNA dataset includes 1186 nodule labels in 888
 patients annotated by radiologists
 ### Preprocessing
 1. Mask extraction
