@@ -1,0 +1,12 @@
+# Ignore some unused frames
+classifier/
+detector/results
+detector/luna_file_id
+detector/labels
+.flag*
+# Ignore some unused file
+*.pyc
+*.npy
+*.ipynb
+*.ckpt
+*.csv

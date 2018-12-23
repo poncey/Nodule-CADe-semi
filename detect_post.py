@@ -12,8 +12,9 @@ import SimpleITK as sitk
 from glob import glob
 import os
 from pandas import DataFrame
+import csv
 
-def true_or_false_positive(lbb,pbb):
+def true_or_false_positive(lbb,pbb):#判断通过标签还有预测中心距离是否大于肺结节半径判断该结节的真假阳性
     if lbb.shape[0]==0:
         flag_lbb = None
     else:
@@ -32,14 +33,14 @@ def true_or_false_positive(lbb,pbb):
             if dx**2+dy**2+dz**2<=lbb_d:
                 flag_lbb[i]=True
                 flag_pbb[j]=True
-    return flag_lbb,flag_pbb
+    return flag_lbb,flag_pbb #输出
         
 
 def pbb_th(pbb,th):
     pbb = pbb[pbb[:,0]>th]
     return pbb
 
-def sigmoid(x):
+def sigmoid(x):#通过sigmoid输出0到1的概率值
     x=1/(1+np.exp(-x))
     return x
 
@@ -238,7 +239,8 @@ missed_nodule = 0
 total_pbb = 0
 true_positive = 0
 false_positive = 0
-
+csvFile=open("output.csv", "wb") 
+writer =csv.writer(csvFile)
 for file_id in id_list:
     print 'processing ',file_id
     #读取bbox
@@ -297,7 +299,11 @@ for file_id in id_list:
     seriesuid = shorter[xx[0]][-1]
 
     assert len(flag_pbb)==len(world_coord)
+ 
 
+    
+    #writer.writerow(["seriesuid","X","Y","Z","TorF"])
+    i=[]
     if world_coord is not None:
         print file_id,seriesuid
         if lbb.shape[0]!=0:
@@ -307,12 +313,16 @@ for file_id in id_list:
         print 'pbb:'
         for iii in range(len(world_coord)):
             print world_coord[iii],flag_pbb[iii]
+            i=[seriesuid,world_coord[iii][0],world_coord[iii][1],world_coord[iii][2],world_coord[iii][3],world_coord[iii][4],flag_pbb[iii]]
+            writer.writerow(i)
+            
         #print world_coord
         #df=save_result_as_cvs(file_id,seriesuid,world_coord)
         #all_df=all_df.append(df,ignore_index=True)
         
         #print all_df
     print '-'*100
+csvFile.close()
 print 'nodule: total ',total_nodule,' miss',missed_nodule
 print 'pbb: total',total_pbb,'true_positive = ',true_positive,'false_positive = ',false_positive
 #all_df.to_csv('my_submission.csv',index=False)
