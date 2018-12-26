@@ -103,11 +103,11 @@ def main():
     datadir = config_detector['preprocess_result_path']
     print 'datadir = ',datadir
 
-    # net = DataParallel(net)
+    net = DataParallel(net, device_ids=[0])
     
     dataset = data.DataBowl3Detector(
         datadir,
-        'luna_file_id/file_id_train.npy',
+        'detector/luna_file_id/file_id_train.npy',
         config,
         phase='train')
     train_loader = DataLoader(
@@ -119,7 +119,7 @@ def main():
 
     dataset = data.DataBowl3Detector(
         datadir,
-        'luna_file_id/file_id_val.npy',
+        'detector/luna_file_id/file_id_val.npy',
         config,
         phase='val')
     val_loader = DataLoader(
@@ -171,7 +171,7 @@ def main():
         split_comber = SplitComb(sidelen, config['max_stride'], config['stride'], margin, config['pad_value'])
         dataset = data.DataBowl3Detector(
             datadir,
-            'luna_file_id/file_id_test.npy',
+            'detector/luna_file_id/file_id_test.npy',
             config,
             phase='test',
             split_comber=split_comber)
