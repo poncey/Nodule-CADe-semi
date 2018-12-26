@@ -18,7 +18,7 @@ def true_or_false_positive(lbb,pbb):#判断通过标签还有预测中心距离�
     if lbb.shape[0]==0:
         flag_lbb = None
     else:
-        flag_lbb = np.zeros(len(lbb),dtype=np.bool)
+        flag_lbb = np.ones(len(lbb),dtype=np.bool)
     flag_pbb = np.zeros(len(pbb),dtype=np.bool)
     for i in range(len(lbb)):
         lbb_x,lbb_y,lbb_z,lbb_d = lbb[i]
@@ -281,39 +281,54 @@ for file_id in id_list:
     true_positive += np.sum(flag_pbb)
     false_positive +=np.sum(1-flag_pbb)
 
-    world_coord=result_to_world_coord(file_id,pbb[:,1:])
-    if lbb.shape[0]!=0:
-        lbb_world_coord = result_to_world_coord(file_id,lbb[:,:]) # lbb的格式为[x,y,z,d]
-    world_coord_and_diam = np.zeros((len(pbb),5))
+    #world_coord=result_to_world_coord(file_id,pbb[:,1:])
+    #if lbb.shape[0]!=0:
+        #lbb_world_coord = result_to_world_coord(file_id,lbb[:,:]) # lbb的格式为[x,y,z,d]
+    #world_coord_and_diam = np.zeros((len(pbb),5))
 
-    world_coord[:,-1]=pbb[:,0]
+    #world_coord[:,-1]=pbb[:,0]
 
-    world_coord_and_diam[:,:3] = world_coord[:,:3]
-    world_coord_and_diam[:,3] = pbb[:,4]
-    world_coord_and_diam[:,-1] = world_coord[:,-1]
+    #world_coord_and_diam[:,:3] = world_coord[:,:3]
+    #world_coord_and_diam[:,3] = pbb[:,4]
+    #world_coord_and_diam[:,-1] = world_coord[:,-1]
     
-    world_coord = world_coord_and_diam #将world_coord的格式从[x,y,z,可能性]改为[x,y,z,d,可能性]
-    world_coord[:,:4]=np.around(world_coord[:,:4],decimals=1)
-    world_coord[:,4] = np.around(world_coord[:,4],decimals=4)
-    xx,yy=np.where(shorter==int(file_id))
-    seriesuid = shorter[xx[0]][-1]
+    #world_coord = world_coord_and_diam #将world_coord的格式从[x,y,z,可能性]改为[x,y,z,d,可能性]
+    #world_coord[:,:4]=np.around(world_coord[:,:4],decimals=1)
+    #world_coord[:,4] = np.around(world_coord[:,4],decimals=4)
+    #xx,yy=np.where(shorter==int(file_id))
+    #seriesuid = shorter[xx[0]][-1]
 
-    assert len(flag_pbb)==len(world_coord)
+    #assert len(flag_pbb)==len(world_coord)
  
 
+    #print pbb
+    pbb_diam = np.zeros((len(pbb),5))
+    pbb_diam[:,0]=pbb[:,1]
+    pbb_diam[:,1]=pbb[:,2]
+    pbb_diam[:,2]=pbb[:,3]
+    pbb_diam[:,3]=pbb[:,4]
+    pbb_diam[:,-1]=pbb[:,0]
+    pbb=pbb_diam
+    pbb[:,:4]=np.around(pbb[:,:4],decimals=2)
+    pbb[:,4]=np.around(pbb[:,4],decimals=4)
+    xx,yy=np.where(shorter==int(file_id))
+    seriesuid=shorter[xx[0]][-1]
     
-    #writer.writerow(["seriesuid","X","Y","Z","TorF"])
+    assert len(flag_pbb)==len(pbb)
+    
+
+    
     i=[]
-    if world_coord is not None:
+    if pbb is not None:
         print file_id,seriesuid
         if lbb.shape[0]!=0:
             print 'lbb:'
-            for jjj in range(len(lbb_world_coord)):
-                print lbb_world_coord[jjj],flag_lbb[jjj]
+            for jjj in range(len(lbb)):
+                print lbb[jjj],flag_lbb[jjj]
         print 'pbb:'
-        for iii in range(len(world_coord)):
-            print world_coord[iii],flag_pbb[iii]
-            i=[seriesuid,world_coord[iii][0],world_coord[iii][1],world_coord[iii][2],world_coord[iii][3],world_coord[iii][4],flag_pbb[iii]]
+        for iii in range(len(pbb)):
+            print pbb[iii],flag_pbb[iii]
+            i=[seriesuid,pbb[iii][0],pbb[iii][1],pbb[iii][2],pbb[iii][3],pbb[iii][4],flag_pbb[iii]]
             writer.writerow(i)
             
         #print world_coord
