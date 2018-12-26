@@ -12,6 +12,7 @@ from scipy.ndimage import zoom
 import warnings
 from scipy.ndimage.interpolation import rotate
 
+
 class DataBowl3Detector(Dataset):
     def __init__(self, data_dir, split_path, config, phase = 'train',split_comber=None):
         assert(phase == 'train' or phase == 'val' or phase == 'test')
@@ -27,7 +28,7 @@ class DataBowl3Detector(Dataset):
         self.augtype = config['augtype']
         self.pad_value = config['pad_value']
         self.split_comber = split_comber
-        idcs = np.load(split_path) # 获取当前phase对应的所有数据集的index
+        idcs = np.load(split_path)  # 获取当前phase对应的所有数据集的index
         if phase!='test':
             idcs = [f for f in idcs if (f not in self.blacklist)]
 

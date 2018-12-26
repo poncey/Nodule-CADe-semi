@@ -58,7 +58,8 @@ parser.add_argument('--n_test', default=1, type=int, metavar='N',
 def main():
     global args
     args = parser.parse_args()
-    
+
+    # TODO: we can modify the GPU status in this section
     torch.manual_seed(0)
     torch.cuda.set_device(0)
 
@@ -101,28 +102,6 @@ def main():
     net = DataParallel(net)
     datadir = config_detector['preprocess_result_path']
     print 'datadir = ',datadir
-    
-    if args.test == 1:
-        margin = 32
-        sidelen = 144
-
-        split_comber = SplitComb(sidelen, config['max_stride'], config['stride'], margin, config['pad_value'])
-        dataset = data.DataBowl3Detector(
-            datadir,
-            'luna_file_id/file_id_test.npy',
-            config,
-            phase='test',
-            split_comber=split_comber)
-        test_loader = DataLoader(
-            dataset,
-            batch_size=1,  # 在测试阶段，batch size 固定为1
-            shuffle=False,
-            num_workers=args.workers,
-            collate_fn=data.collate,
-            pin_memory=False)
-        
-        test(test_loader, net, get_pbb, save_dir,config)
-        return
 
     # net = DataParallel(net)
     
@@ -165,15 +144,53 @@ def main():
             lr = 0.01 * args.lr
         return lr
 
+    # Training and Validation approach
+    train_loss_l, validate_loss_l = [], []
+    train_tpr_l, validate_tpr_l = [], []
     for epoch in range(start_epoch, args.epochs + 1):
-        train(train_loader, net, loss, epoch, optimizer, get_lr, args.save_freq, save_dir)
-        validate(val_loader, net, loss)
+        train_loss, train_tpr = train(train_loader, net, loss, epoch, optimizer, get_lr, args.save_freq, save_dir)
+        validate_loss, validate_tpr = validate(val_loader, net, loss)
+        train_loss_l.append(train_loss)
+        validate_loss_l.append(validate_loss)
+        train_tpr_l.append(train_tpr)
+        validate_loss_l.append(validate_tpr)
+    # Save Train-loss and Validate-Loss
+    if not os.path.exists('./train-vali-results'):
+        os.mkdir('./train-vali-results')
+    np.save('./train-vali-results/train-loss.npy', np.asarray(train_loss_l))
+    np.save('./train-vali-results/validation-loss.npy', np.asarray(validate_loss_l))
+    np.save('./train-vali-results/train-tpr.npy', np.asarray(train_tpr_l))
+    np.save('./train-vali-results/validation-tpr.npy', np.asarray(validate_tpr_l))
+    print "Finished saving training results"
+
+    # test process
+    if args.test == 1:
+        margin = 32
+        sidelen = 144
+
+        split_comber = SplitComb(sidelen, config['max_stride'], config['stride'], margin, config['pad_value'])
+        dataset = data.DataBowl3Detector(
+            datadir,
+            'luna_file_id/file_id_test.npy',
+            config,
+            phase='test',
+            split_comber=split_comber)
+        test_loader = DataLoader(
+            dataset,
+            batch_size=1,  # 在测试阶段，batch size 固定为1
+            shuffle=False,
+            num_workers=args.workers,
+            collate_fn=data.collate,
+            pin_memory=False)
+
+        test(test_loader, net, get_pbb, save_dir, config)
+        return
 
 
 def train(data_loader, net, loss, epoch, optimizer, get_lr, save_freq, save_dir):
     start_time = time.time()
     
-    net.train()
+    net.train()  # Setting to
     lr = get_lr(epoch)
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
@@ -191,7 +208,7 @@ def train(data_loader, net, loss, epoch, optimizer, get_lr, save_freq, save_dir)
         optimizer.step()
 
         loss_output[0] = loss_output[0].data[0]
-        metrics.append(loss_output)  # metrics一个list，每个元素是一个图块的loss。总共图块数=所有结节数/0.7
+        metrics.append(loss_output)  # metrics, 一个list，每个元素是一个图块的loss。总共图块数=所有结节数/0.7
         # print('epoch = ',epoch,'    i = ',i,'    loss_output = ',loss_output)
 
     if epoch % args.save_freq == 0:            
@@ -210,10 +227,12 @@ def train(data_loader, net, loss, epoch, optimizer, get_lr, save_freq, save_dir)
     end_time = time.time()
 
     metrics = np.asarray(metrics, np.float32)
+    tpr = np.sum(metrics[:, 6]) / np.sum(metrics[:, 7])
+
     print 'metrics[0] = ',metrics[0]
     print('Epoch %03d (lr %.5f)' % (epoch, lr))
     print('Train:      tpr %3.2f, tnr %3.2f, total pos %d, total neg %d, time %3.2f' % (
-        100.0 * np.sum(metrics[:, 6]) / np.sum(metrics[:, 7]),
+        100.0 * tpr,
         100.0 * np.sum(metrics[:, 8]) / np.sum(metrics[:, 9]),
         np.sum(metrics[:, 7]),
         np.sum(metrics[:, 9]),
@@ -226,6 +245,8 @@ def train(data_loader, net, loss, epoch, optimizer, get_lr, save_freq, save_dir)
         np.mean(metrics[:, 4]),
         np.mean(metrics[:, 5])))
     print
+
+    return np.mean(metrics[:, 0]), tpr  # Return total loss of single epoch
 
 
 def validate(data_loader, net, loss):
@@ -241,15 +262,16 @@ def validate(data_loader, net, loss):
             coord = Variable(coord.cuda(async=True))  # coord = Variable(coord.cuda(async = True), volatile = True)
 
             output = net(data, coord)
-            loss_output = loss(output, target, train = False)
+            loss_output = loss(output, target, train=False)
 
             loss_output[0] = loss_output[0].data[0]
             metrics.append(loss_output)    
     end_time = time.time()
 
     metrics = np.asarray(metrics, np.float32)
+    tpr = np.sum(metrics[:, 6]) / np.sum(metrics[:, 7])
     print('Validation: tpr %3.2f, tnr %3.8f, total pos %d, total neg %d, time %3.2f' % (
-        100.0 * np.sum(metrics[:, 6]) / np.sum(metrics[:, 7]),
+        100.0 * tpr,
         100.0 * np.sum(metrics[:, 8]) / np.sum(metrics[:, 9]),
         np.sum(metrics[:, 7]),
         np.sum(metrics[:, 9]),
@@ -264,18 +286,21 @@ def validate(data_loader, net, loss):
     print
     print
 
+    return np.mean(metrics[:, 0]), tpr  # Return total loss of single epoch
+
 
 def test(data_loader, net, get_pbb, save_dir, config):
     start_time = time.time()
-    save_dir = os.path.join(save_dir,'bbox') # detector/results/res18/bbox
+    save_dir = os.path.join(save_dir, 'bbox')  # detector/results/res18/bbox
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
-    print(save_dir)
+    print('saving path:', save_dir)
     net.eval()  # 把模型设置为评估模式，只对dropout、batch norm有影响
     namelist = []
     split_comber = data_loader.dataset.split_comber
     for i_name, (data, target, coord, nzhw) in enumerate(data_loader):
-        # 从data_loader获取出来一个batch的数据。每个torch.tensor被封装为长度为batch size的List，其它类型的数据（如numpy.array）被封装成长度为batch size的tuple。本模型在test阶段的batch size 为 抠出的肺部块分割成了208*208*208之后总共分割的块数。
+        # 从data_loader获取出来一个batch的数据。每个torch.tensor被封装为长度为batch size的List，其它类型的数据（如numpy.array）
+        # 被封装成长度为batch size的tuple。本模型在test阶段的batch size 为 抠出的肺部块分割成了208*208*208之后总共分割的块数。
         s = time.time()
         target = [np.asarray(t, np.float32) for t in target]
         lbb = target[0]
@@ -302,15 +327,15 @@ def test(data_loader, net, get_pbb, save_dir, config):
             with torch.no_grad():  # 注意，只要是tensor参与计算的，如果不需要反向传播，就一定要将tensor放在torch.no_grad():区域内，以节省显存
                 input = Variable(data[splitlist[i]:splitlist[i+1]]).cuda()  # input = Variable(data[splitlist[i]:splitlist[i+1]], volatile = True).cuda()
                 inputcoord = Variable(coord[splitlist[i]:splitlist[i+1]]).cuda()  # inputcoord = Variable(coord[splitlist[i]:splitlist[i+1]], volatile = True).cuda()
-                print('input.shape = ',input.shape,' inputcoord.shape = ',inputcoord.shape)
+                print('input.shape = ', input.shape,' inputcoord.shape = ', inputcoord.shape)
                 if isfeat:
-                    output,feature = net(input,inputcoord)
+                    output, feature = net(input,inputcoord)
                     featurelist.append(feature.data.cpu().numpy())
                 else:
                     output = net(input,inputcoord)
                 outputlist.append(output.data.cpu().numpy())
         output = np.concatenate(outputlist,0)
-        print('output.shape = ',output.shape)
+        print('output.shape = ', output.shape)
         # print('output = ',output)
         output = split_comber.combine(output,nzhw=nzhw) # 这里的返回值就是整个肺部扫描（抠出了肺部）所对应的完整bbox预测
         # if isfeat:
@@ -320,7 +345,7 @@ def test(data_loader, net, get_pbb, save_dir, config):
             # print('sidelen = ',sidelen)
 
         thresh = -3
-        pbb,mask = get_pbb(output,thresh, ismask=True)  # pbb的形状为[-1,5]，因为使用了sigmoid(thresh)作为阈值进行了过滤，因此这里可以直接使用作者写好的nms函数进行去重，这里没有调用nms，应该是在分类的时候才进行了调用
+        pbb, mask = get_pbb(output,thresh, ismask=True)  # pbb的形状为[-1,5]，因为使用了sigmoid(thresh)作为阈值进行了过滤，因此这里可以直接使用作者写好的nms函数进行去重，这里没有调用nms，应该是在分类的时候才进行了调用
         print('pbb.shape = ', pbb.shape)
         if isfeat:
             feature_selected = feature[mask[0], mask[1],mask[2]]
