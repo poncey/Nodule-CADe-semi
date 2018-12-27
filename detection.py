@@ -50,6 +50,10 @@ parser.add_argument('--gpu', default='all', type=str, metavar='N',
 parser.add_argument('--n_test', default=1, type=int, metavar='N',
                     help='number of gpu for test')
 
+cuda_device = "0, 1, 2, 3"
+os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+os.environ["CUDA_VISIBLE_DEVICES"] = cuda_device
+
 # eps=100
 # CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7,8 python main.py --model res18 -b 32 --epochs $eps --save-dir res18
 # 训练detector时，使用的模型是res18，batch size是32，epoch=100，训练完毕后的模型参数保存在res18文件夹内。
@@ -59,9 +63,8 @@ def main():
     global args
     args = parser.parse_args()
 
-    # TODO: we can modify the GPU status in this section
     torch.manual_seed(0)
-    torch.cuda.set_device(0)
+    torch.cuda.manual_seed_all(0)
 
     model = import_module(args.model)
     config, net, loss, get_pbb = model.get_model()
@@ -103,7 +106,7 @@ def main():
     datadir = config_detector['preprocess_result_path']
     print 'datadir = ',datadir
 
-    net = DataParallel(net, device_ids=[0])
+    net = DataParallel(net, device_ids=[0, 1, 2, 3])
     
     dataset = data.DataBowl3Detector(
         datadir,
@@ -157,10 +160,10 @@ def main():
     # Save Train-loss and Validate-Loss
     if not os.path.exists('./train-vali-results'):
         os.mkdir('./train-vali-results')
-    np.save('./train-vali-results/train-loss.npy', np.asarray(train_loss_l))
-    np.save('./train-vali-results/validation-loss.npy', np.asarray(validate_loss_l))
-    np.save('./train-vali-results/train-tpr.npy', np.asarray(train_tpr_l))
-    np.save('./train-vali-results/validation-tpr.npy', np.asarray(validate_tpr_l))
+    np.save('./train-vali-results/train-loss.npy', np.asarray(train_loss_l).astype(np.float64))
+    np.save('./train-vali-results/validation-loss.npy', np.asarray(validate_loss_l).astype(np.float64))
+    np.save('./train-vali-results/train-tpr.npy', np.asarray(train_tpr_l).astype(np.float64))
+    np.save('./train-vali-results/validation-tpr.npy', np.asarray(validate_tpr_l).astype(np.float64))
     print "Finished saving training results"
 
     # test process
@@ -327,7 +330,7 @@ def test(data_loader, net, get_pbb, save_dir, config):
             with torch.no_grad():  # 注意，只要是tensor参与计算的，如果不需要反向传播，就一定要将tensor放在torch.no_grad():区域内，以节省显存
                 input = Variable(data[splitlist[i]:splitlist[i+1]]).cuda()  # input = Variable(data[splitlist[i]:splitlist[i+1]], volatile = True).cuda()
                 inputcoord = Variable(coord[splitlist[i]:splitlist[i+1]]).cuda()  # inputcoord = Variable(coord[splitlist[i]:splitlist[i+1]], volatile = True).cuda()
-                print('input.shape = ', input.shape,' inputcoord.shape = ', inputcoord.shape)
+                print('input.shape = ', input.shape, ' inputcoord.shape = ', inputcoord.shape)
                 if isfeat:
                     output, feature = net(input,inputcoord)
                     featurelist.append(feature.data.cpu().numpy())
@@ -354,8 +357,8 @@ def test(data_loader, net, get_pbb, save_dir, config):
         # print([len(tp),len(fp),len(fn)])
         print('iname,name = ', [i_name,name])
         e = time.time()
-        np.save(os.path.join(save_dir, name+'_pbb.npy'), pbb)  # pbb的形状为[-1,5]，已经使用sigmoid(thresh)过滤了
-        np.save(os.path.join(save_dir, name+'_lbb.npy'), lbb)  # lbb只是把人工标记给保存了起来
+        np.save(os.path.join(save_dir, name+'_pbb.npy'), pbb.astype(np.float64))  # pbb的形状为[-1,5]，已经使用sigmoid(thresh)过滤了
+        np.save(os.path.join(save_dir, name+'_lbb.npy'), lbb.astype(np.float64))  # lbb只是把人工标记给保存了起来
     np.save(os.path.join(save_dir, 'namelist.npy'), namelist)
     end_time = time.time()
 
