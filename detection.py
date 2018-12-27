@@ -242,6 +242,8 @@ def main():
         net.apply(weights_init)
 
         for epoch in range(start_epoch, args.epochs + 1):
+            if not os.path.exists(os.path.join(save_dir, 'fold{:d}'.format(k_fold))):
+                os.makedirs(os.path.join(save_dir, 'fold{:d}'.format(k_fold)))
             train_loss, train_tpr = train(train_loader, net, loss, epoch, optimizer, get_lr, args.save_freq,
                                           os.path.join(save_dir, 'fold{:d}'.format(k_fold)))
             validate_loss, validate_tpr = validate(val_loader, net, loss)
@@ -284,6 +286,8 @@ def main():
                 collate_fn=data.collate,
                 pin_memory=False)
 
+            if not os.path.exists(os.path.join(save_dir, 'fold{:d}'.format(k_fold))):
+                os.makedirs(os.path.join(save_dir, 'fold{:d}'.format(k_fold)))
             test(test_loader, net, get_pbb, os.path.join(save_dir, 'fold{:d}'.format(k_fold)), config)
             return
 
