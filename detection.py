@@ -106,7 +106,7 @@ def main():
     datadir = config_detector['preprocess_result_path']
     print 'datadir = ',datadir
 
-    net = DataParallel(net, device_ids=[0, 1, 2, 3])
+    net = DataParallel(net, device_ids=[0])
     
     dataset = data.DataBowl3Detector(
         datadir,
