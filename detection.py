@@ -78,7 +78,7 @@ def main():
         if not save_dir:
             save_dir = checkpoint['save_dir']
         else:
-            save_dir = os.path.join('results',save_dir)
+            save_dir = os.path.join('results', save_dir)
         net.load_state_dict(checkpoint['state_dict'])
     else:
         if start_epoch == 0:
@@ -108,29 +108,29 @@ def main():
 
     net = DataParallel(net, device_ids=[0])
     
-    dataset = data.DataBowl3Detector(
-        datadir,
-        'detector/luna_file_id/file_id_train.npy',
-        config,
-        phase='train')
-    train_loader = DataLoader(
-        dataset,
-        batch_size=args.batch_size,
-        shuffle=True,
-        num_workers=args.workers,
-        pin_memory=True)
-
-    dataset = data.DataBowl3Detector(
-        datadir,
-        'detector/luna_file_id/file_id_val.npy',
-        config,
-        phase='val')
-    val_loader = DataLoader(
-        dataset,
-        batch_size=args.batch_size,
-        shuffle=False,
-        num_workers=args.workers,
-        pin_memory=True)
+    # dataset = data.DataBowl3Detector(
+    #     datadir,
+    #     'detector/luna_file_id/file_id_train.npy',
+    #     config,
+    #     phase='train')
+    # train_loader = DataLoader(
+    #     dataset,
+    #     batch_size=args.batch_size,
+    #     shuffle=True,
+    #     num_workers=args.workers,
+    #     pin_memory=True)
+    #
+    # dataset = data.DataBowl3Detector(
+    #     datadir,
+    #     'detector/luna_file_id/file_id_val.npy',
+    #     config,
+    #     phase='val')
+    # val_loader = DataLoader(
+    #     dataset,
+    #     batch_size=args.batch_size,
+    #     shuffle=False,
+    #     num_workers=args.workers,
+    #     pin_memory=True)
 
     optimizer = torch.optim.SGD(
         net.parameters(),
@@ -147,47 +147,124 @@ def main():
             lr = 0.01 * args.lr
         return lr
 
-    # Training and Validation approach
-    train_loss_l, validate_loss_l = [], []
-    train_tpr_l, validate_tpr_l = [], []
-    for epoch in range(start_epoch, args.epochs + 1):
-        train_loss, train_tpr = train(train_loader, net, loss, epoch, optimizer, get_lr, args.save_freq, save_dir)
-        validate_loss, validate_tpr = validate(val_loader, net, loss)
-        train_loss_l.append(train_loss)
-        validate_loss_l.append(validate_loss)
-        train_tpr_l.append(train_tpr)
-        validate_tpr_l.append(validate_tpr)
-    # Save Train-loss and Validate-Loss
-    if not os.path.exists('./train-vali-results'):
-        os.mkdir('./train-vali-results')
-    np.save('./train-vali-results/train-loss.npy', np.asarray(train_loss_l).astype(np.float64))
-    np.save('./train-vali-results/validation-loss.npy', np.asarray(validate_loss_l).astype(np.float64))
-    np.save('./train-vali-results/train-tpr.npy', np.asarray(train_tpr_l).astype(np.float64))
-    np.save('./train-vali-results/validation-tpr.npy', np.asarray(validate_tpr_l).astype(np.float64))
-    print "Finished saving training results"
+    # # Training and Validation approach
+    # train_loss_l, validate_loss_l = [], []
+    # train_tpr_l, validate_tpr_l = [], []
+    # for epoch in range(start_epoch, args.epochs + 1):
+    #     train_loss, train_tpr = train(train_loader, net, loss, epoch, optimizer, get_lr, args.save_freq, save_dir)
+    #     validate_loss, validate_tpr = validate(val_loader, net, loss)
+    #     train_loss_l.append(train_loss)
+    #     validate_loss_l.append(validate_loss)
+    #     train_tpr_l.append(train_tpr)
+    #     validate_tpr_l.append(validate_tpr)
+    # # Save Train-loss and Validate-Loss
+    # if not os.path.exists('./train-vali-results'):
+    #     os.mkdir('./train-vali-results')
+    # np.save('./train-vali-results/train-loss.npy', np.asarray(train_loss_l).astype(np.float64))
+    # np.save('./train-vali-results/validation-loss.npy', np.asarray(validate_loss_l).astype(np.float64))
+    # np.save('./train-vali-results/train-tpr.npy', np.asarray(train_tpr_l).astype(np.float64))
+    # np.save('./train-vali-results/validation-tpr.npy', np.asarray(validate_tpr_l).astype(np.float64))
+    # print "Finished saving training results"
+    #
+    # # test process
+    # if args.test == 1:
+    #     margin = 32
+    #     sidelen = 144
+    #
+    #     split_comber = SplitComb(sidelen, config['max_stride'], config['stride'], margin, config['pad_value'])
+    #     dataset = data.DataBowl3Detector(
+    #         datadir,
+    #         'detector/luna_file_id/file_id_test.npy',
+    #         config,
+    #         phase='test',
+    #         split_comber=split_comber)
+    #     test_loader = DataLoader(
+    #         dataset,
+    #         batch_size=1,  # 在测试阶段，batch size 固定为1
+    #         shuffle=False,
+    #         num_workers=args.workers,
+    #         collate_fn=data.collate,
+    #         pin_memory=False)
+    #
+    #     test(test_loader, net, get_pbb, save_dir, config)
+    #     return
 
-    # test process
-    if args.test == 1:
-        margin = 32
-        sidelen = 144
+    # TODO: Cross-Validation with file_ids
+    for k_fold in range(10):
 
-        split_comber = SplitComb(sidelen, config['max_stride'], config['stride'], margin, config['pad_value'])
+        # Loading training set
         dataset = data.DataBowl3Detector(
             datadir,
-            'detector/luna_file_id/file_id_test.npy',
+            'detector/luna_file_id/subset_{:d}'.format(k_fold) + '/file_id_train.npy',
             config,
-            phase='test',
-            split_comber=split_comber)
-        test_loader = DataLoader(
+            phase='train'
+        )
+        train_loader = DataLoader(
             dataset,
-            batch_size=1,  # 在测试阶段，batch size 固定为1
+            batch_size=args.batch_size,
+            shuffle=True,
+            num_workers=args.workers,
+            pin_memory=True)
+        # Loading validation set
+        dataset = data.DataBowl3Detector(
+            datadir,
+            'detector/luna_file_id/subset_{:d}'.format(k_fold) + '/file_id_val.npy',
+            config,
+            phase='val')
+        val_loader = DataLoader(
+            dataset,
+            batch_size=args.batch_size,
             shuffle=False,
             num_workers=args.workers,
-            collate_fn=data.collate,
-            pin_memory=False)
+            pin_memory=True)
 
-        test(test_loader, net, get_pbb, save_dir, config)
-        return
+        # Training process
+        train_loss_l, validate_loss_l = [], []
+        train_tpr_l, validate_tpr_l = [], []
+        for epoch in range(start_epoch, args.epochs + 1):
+            train_loss, train_tpr = train(train_loader, net, loss, epoch, optimizer, get_lr, args.save_freq, save_dir)
+            validate_loss, validate_tpr = validate(val_loader, net, loss)
+
+            # Append loss results
+            train_loss_l.append(train_loss)
+            validate_loss_l.append(validate_loss)
+            train_tpr_l.append(train_tpr)
+            validate_tpr_l.append(validate_tpr)
+
+        # Save Train-Validation results
+        if not os.path.exists('./train-vali-results/fold{:d}'.format(k_fold)):
+            os.makedirs('./train-vali-results/fold{:d}'.format(k_fold))
+        np.save('./train-vali-results/fold{:d}'.format(k_fold) + '/train-loss.npy',
+                np.asarray(train_loss_l).astype(np.float64))
+        np.save('./train-vali-results/fold{:d}'.format(k_fold) + '/validation-loss.npy',
+                np.asarray(validate_loss_l).astype(np.float64))
+        np.save('./train-vali-results/fold{:d}'.format(k_fold) + '/train-tpr.npy',
+                np.asarray(train_tpr_l).astype(np.float64))
+        np.save('./train-vali-results/fold{:d}'.format(k_fold) + '/validation-tpr.npy',
+                np.asarray(validate_tpr_l).astype(np.float64))
+
+        # Testing process
+        if args.test == 1:
+            margin = 32
+            sidelen = 144
+
+            split_comber = SplitComb(sidelen, config['max_stride'], config['stride'], margin, config['pad_value'])
+            dataset = data.DataBowl3Detector(
+                datadir,
+                'detector/luna_file_id/subset_{:d}'.format(k_fold) + '/file_id_test.npy',
+                config,
+                phase='test',
+                split_comber=split_comber)
+            test_loader = DataLoader(
+                dataset,
+                batch_size=1,  # 在测试阶段，batch size 固定为1
+                shuffle=False,
+                num_workers=args.workers,
+                collate_fn=data.collate,
+                pin_memory=False)
+
+            test(test_loader, net, get_pbb, os.path.join(save_dir, 'fold{:d}'.format(k_fold)), config)
+            return
 
 
 def train(data_loader, net, loss, epoch, optimizer, get_lr, save_freq, save_dir):
