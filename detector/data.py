@@ -14,22 +14,22 @@ from scipy.ndimage.interpolation import rotate
 
 
 class DataBowl3Detector(Dataset):
-    def __init__(self, data_dir, split_path, config, phase = 'train',split_comber=None):
+    def __init__(self, data_dir, split_path, config, phase='train', split_comber=None):
         assert(phase == 'train' or phase == 'val' or phase == 'test')
         self.phase = phase
         self.max_stride = config['max_stride']       
-        self.stride = config['stride'] # =4
+        self.stride = config['stride']  # =4
         sizelim = config['sizelim']/config['reso']
         sizelim2 = config['sizelim2']/config['reso']
         sizelim3 = config['sizelim3']/config['reso']
         self.blacklist = config['blacklist']
         self.isScale = config['aug_scale']
-        self.r_rand = config['r_rand_crop'] # =0.3
+        self.r_rand = config['r_rand_crop']  # =0.3
         self.augtype = config['augtype']
         self.pad_value = config['pad_value']
         self.split_comber = split_comber
         idcs = np.load(split_path)  # 获取当前phase对应的所有数据集的index
-        if phase!='test':
+        if phase != 'test':
             idcs = [f for f in idcs if (f not in self.blacklist)]
 
         self.filenames = [os.path.join(data_dir, '%s_clean.npy' % idx) for idx in idcs]
@@ -41,61 +41,61 @@ class DataBowl3Detector(Dataset):
         labels = []
         
         for idx in idcs:
-            l = np.load(os.path.join(data_dir, '%s_label.npy' %idx))
-            if np.all(l==0):
-                l=np.array([])
+            l = np.load(os.path.join(data_dir, '%s_label.npy' % idx))
+            if np.all(l == 0):
+                l = np.array([])
             labels.append(l)
 
-        self.sample_bboxes = labels # labels是长度为文件数的list，每个list元素为一个numpy数组，存储了对应文件的所有结节信息
+        self.sample_bboxes = labels  # labels是长度为文件数的list，每个list元素为一个numpy数组，存储了对应文件的所有结节信息
         if self.phase != 'test':
             self.bboxes = []
             for i, l in enumerate(labels):
-                if len(l) > 0 : # 有的文件没有结节，所以去掉
-                    #print '第{%d}个文件有{%d}个结节' % (i,len(l))
+                if len(l) > 0:  # 有的文件没有结节，所以去掉
+                    # print '第{%d}个文件有{%d}个结节' % (i,len(l))
                     for t in l:
-                        if t[3]>sizelim: # 也就是小于6mm的结节直接丢弃，不使用
+                        if t[3] > sizelim:  # 也就是小于6mm的结节直接丢弃，不使用
                             self.bboxes.append([np.concatenate([[i],t])])
-                        if t[3]>sizelim2:
-                            self.bboxes+=[[np.concatenate([[i],t])]]*2 # 大于30毫米的多录入2次
-                        if t[3]>sizelim3:
-                            self.bboxes+=[[np.concatenate([[i],t])]]*4 # 大于40毫米的多录入6次
+                        if t[3] > sizelim2:
+                            self.bboxes += [[np.concatenate([[i],t])]]*2  # 大于30毫米的多录入2次
+                        if t[3] > sizelim3:
+                            self.bboxes += [[np.concatenate([[i],t])]]*4  # 大于40毫米的多录入6次
             
-            self.bboxes = np.concatenate(self.bboxes,axis = 0)
-            #print('self.bboxes.shape = ',self.bboxes.shape)
-            #print('self.bboxes = ',self.bboxes)
+            self.bboxes = np.concatenate(self.bboxes, axis=0)
+            # print('self.bboxes.shape = ',self.bboxes.shape)
+            # print('self.bboxes = ',self.bboxes)
 
         self.crop = Crop(config)
         self.label_mapping = LabelMapping(config, self.phase)
 
-    def __getitem__(self, idx,split=None): # 获取第idx个样本，所有样本分为70%正例和30%反例。每个样本包括图块和对应的标签。
+    def __getitem__(self, idx, split=None):  # 获取第idx个样本，所有样本分为70%正例和30%反例。每个样本包括图块和对应的标签。
         t = time.time()
-        np.random.seed(int(str(t%1)[2:7]))#seed according to time
+        np.random.seed(int(str(t % 1)[2:7]))  # seed according to time
 
-        isRandomImg  = False
-        if self.phase !='test':
-            if idx>=len(self.bboxes): # 如果idx大于结节总数，就是要进行随机生成30%的反例了
-                isRandom = True # 这个变量控制着当前是生成正例还是反例，true代表反例，false代表正例
-                idx = idx%len(self.bboxes)
-                #isRandomImg = np.random.randint(2) # 这个变量控制着是从所有train数据集还是从kaggle数据集生成反例（作者采用的train数据集包括luna和kaggle两个数据集）
+        isRandomImg = False
+        if self.phase != 'test':
+            if idx >= len(self.bboxes):  # 如果idx大于结节总数，就是要进行随机生成30%的反例了
+                isRandom = True  # 这个变量控制着当前是生成正例还是反例，true代表反例，false代表正例
+                idx = idx % len(self.bboxes)
+                # isRandomImg = np.random.randint(2) # 这个变量控制着是从所有train数据集还是从kaggle数据集生成反例（作者采用的train数据集包括luna和kaggle两个数据集）
             else:
                 isRandom = False
         else:
             isRandom = False
         
         if self.phase != 'test':
-            if not isRandomImg: #当需要生成70%正例、或使用所有train数据集生成30%反例时，在所有的train数据集中（作者采用的是luna+kaggle数据集）生成正例、反例
-                bbox = self.bboxes[idx] # 获取第idx个结节
-                filename = self.filenames[int(bbox[0])] # 获取当前第idx个结节对应的肺部图片文件名的索引
+            if not isRandomImg:  #当需要生成70%正例、或使用所有train数据集生成30%反例时，在所有的train数据集中（作者采用的是luna+kaggle数据集）生成正例、反例
+                bbox = self.bboxes[idx]  # 获取第idx个结节
+                filename = self.filenames[int(bbox[0])]  # 获取当前第idx个结节对应的肺部图片文件名的索引
                 #print('bbox = ',bbox)
-                imgs = np.load(filename) # imgs.shape=[1,depth,height,width]
+                imgs = np.load(filename)  # imgs.shape=[1,depth,height,width]
                 
-                bboxes = self.sample_bboxes[int(bbox[0])] # 获取肺部图片对应的所有结节
-                isScale = self.augtype['scale'] and (self.phase=='train') # 当生成训练数据时，包含结节的图块需要在一定范围内随机缩放
+                bboxes = self.sample_bboxes[int(bbox[0])]  # 获取肺部图片对应的所有结节
+                isScale = self.augtype['scale'] and (self.phase=='train')  # 当生成训练数据时，包含结节的图块需要在一定范围内随机缩放
                 sample, target, bboxes, coord = self.crop(imgs, bbox[1:], bboxes,isScale,isRandom)
-                if self.phase=='train' and not isRandom: # 当处于训练阶段，且生成的是正例时，对正例做数据增强
+                if self.phase=='train' and not isRandom:  # 当处于训练阶段，且生成的是正例时，对正例做数据增强
                      sample, target, bboxes, coord = augment(sample, target, bboxes, coord,
-                        ifflip = self.augtype['flip'], ifrotate=self.augtype['rotate'], ifswap = self.augtype['swap'])
-            else:# 使用kaggle数据。因为我们没有kaggle数据，所以isRandomImg一直为False
+                        ifflip=self.augtype['flip'], ifrotate=self.augtype['rotate'], ifswap = self.augtype['swap'])
+            else:  # 使用kaggle数据。因为我们没有kaggle数据，所以isRandomImg一直为False
                 randimid = np.random.randint(len(self.kagglenames))
                 filename = self.kagglenames[randimid]
                 imgs = np.load(filename)
@@ -123,25 +123,25 @@ class DataBowl3Detector(Dataset):
                                    np.linspace(-0.5,0.5,imgs.shape[2]/self.stride),
                                    np.linspace(-0.5,0.5,imgs.shape[3]/self.stride),indexing ='ij')
             coord = np.concatenate([xx[np.newaxis,...], yy[np.newaxis,...],zz[np.newaxis,:]],0).astype('float32') # 所有anchor的中心点坐标（归一化后的），注意，所有的坐标范围是[-0.5,0.5]
-            imgs, nzhw = self.split_comber.split(imgs) # 当前肺部扫描分割出的所有1*208*208*208图块，nzhw是一个数组，包含三个元素nz,nh,nw，即每个维度分割出了多少个144（也可以理解为分割出了多少个208）
+            imgs, nzhw = self.split_comber.split(imgs)  # 当前肺部扫描分割出的所有1*208*208*208图块，nzhw是一个数组，包含三个元素nz,nh,nw，即每个维度分割出了多少个144（也可以理解为分割出了多少个208）
             coord2, nzhw2 = self.split_comber.split(coord,
-                                                   side_len = self.split_comber.side_len/self.stride,
-                                                   max_stride = self.split_comber.max_stride/self.stride,
-                                                   margin = self.split_comber.margin/self.stride) # 对anchor的中心点坐标做同样的分割，使得每个208*208*208图块有与之对应的anchor，且anchor的坐标为原肺部图坐标
+                                                   side_len=self.split_comber.side_len/self.stride,
+                                                   max_stride=self.split_comber.max_stride/self.stride,
+                                                   margin=self.split_comber.margin/self.stride)  # 对anchor的中心点坐标做同样的分割，使得每个208*208*208图块有与之对应的anchor，且anchor的坐标为原肺部图坐标
             assert np.all(nzhw==nzhw2)
             imgs = (imgs.astype(np.float32)-128)/128 # 对图片归一化
-            return torch.from_numpy(imgs), bboxes, torch.from_numpy(coord2), np.array(nzhw) # 类型属于torch.tensor的会被封装成长度为batch size的List，其它的类型会被封装成长度为batch size的tuple
+            return torch.from_numpy(imgs), bboxes, torch.from_numpy(coord2), np.array(nzhw)  # 类型属于torch.tensor的会被封装成长度为batch size的List，其它的类型会被封装成长度为batch size的tuple
 
     def __len__(self):
         if self.phase == 'train':
             return len(self.bboxes)/(1-self.r_rand) # train阶段的样本总量为：结节总数/0.7
-        elif self.phase =='val':
-            return len(self.bboxes) # val阶段的样本总量为：结节总数
+        elif self.phase == 'val':
+            return len(self.bboxes)  # val阶段的样本总量为：结节总数
         else:
-            return len(self.sample_bboxes) # test阶段的样本总量：肺部扫描的文件数
+            return len(self.sample_bboxes)  # test阶段的样本总量：肺部扫描的文件数
         
         
-def augment(sample, target, bboxes, coord, ifflip = True, ifrotate=True, ifswap = True):
+def augment(sample, target, bboxes, coord, ifflip=True, ifrotate=True, ifswap=True):
     #                     angle1 = np.random.rand()*180
     if ifrotate:
         validrot = False
@@ -172,7 +172,7 @@ def augment(sample, target, bboxes, coord, ifflip = True, ifrotate=True, ifswap 
             bboxes[:,:3] = bboxes[:,:3][:,axisorder]
             
     if ifflip:
-#         flipid = np.array([np.random.randint(2),np.random.randint(2),np.random.randint(2)])*2-1
+        # flipid = np.array([np.random.randint(2),np.random.randint(2),np.random.randint(2)])*2-1
         flipid = np.array([1,np.random.randint(2),np.random.randint(2)])*2-1
         sample = np.ascontiguousarray(sample[:,::flipid[0],::flipid[1],::flipid[2]])
         coord = np.ascontiguousarray(coord[:,::flipid[0],::flipid[1],::flipid[2]])
@@ -181,6 +181,7 @@ def augment(sample, target, bboxes, coord, ifflip = True, ifrotate=True, ifswap 
                 target[ax] = np.array(sample.shape[ax+1])-target[ax]
                 bboxes[:,ax]= np.array(sample.shape[ax+1])-bboxes[:,ax]
     return sample, target, bboxes, coord 
+
 
 class Crop(object):
     def __init__(self, config):
@@ -192,15 +193,15 @@ class Crop(object):
         if isScale:
             radiusLim = [8.,120.]
             scaleLim = [0.75,1.25]
-            scaleRange = [np.min([np.max([(radiusLim[0]/target[3]),scaleLim[0]]),1])
-                         ,np.max([np.min([(radiusLim[1]/target[3]),scaleLim[1]]),1])]
-            scale = np.random.rand()*(scaleRange[1]-scaleRange[0])+scaleRange[0] # 待研究，初步判断为缩放比例scale的范围是[0.75,1.25]。注意，这里的比例的用法是 缩放后的待裁剪尺寸=[128,128,128]/scale
-            crop_size = (np.array(self.crop_size).astype('float')/scale).astype('int') # 对裁剪尺寸进行缩放
+            scaleRange = [np.min([np.max([(radiusLim[0]/target[3]),scaleLim[0]]), 1])
+                         ,np.max([np.min([(radiusLim[1]/target[3]),scaleLim[1]]), 1])]
+            scale = np.random.rand()*(scaleRange[1]-scaleRange[0])+scaleRange[0]  # 待研究，初步判断为缩放比例scale的范围是[0.75,1.25]。注意，这里的比例的用法是 缩放后的待裁剪尺寸=[128,128,128]/scale
+            crop_size = (np.array(self.crop_size).astype('float')/scale).astype('int')  # 对裁剪尺寸进行缩放
         else:
             crop_size=self.crop_size
         bound_size = self.bound_size
-        target = np.copy(target) # target是第idx个结节的坐标和直径信息
-        bboxes = np.copy(bboxes) # bboxes是当前图片的所有肺结节的坐标和直径信息
+        target = np.copy(target)  # target是第idx个结节的坐标和直径信息
+        bboxes = np.copy(bboxes)  # bboxes是当前图片的所有肺结节的坐标和直径信息
         
         start = []
         for i in range(3):
@@ -265,12 +266,13 @@ class Crop(object):
                 pad2 = [[0,0],[0,newpad],[0,newpad],[0,newpad]]
                 crop = np.pad(crop,pad2,'constant',constant_values =self.pad_value)
             for i in range(4):
-                target[i] = target[i]*scale # 将第idx个结节的相对裁剪块的中心点坐标和直径也像裁剪的图块一样缩放
+                target[i] = target[i]*scale  # 将第idx个结节的相对裁剪块的中心点坐标和直径也像裁剪的图块一样缩放
             for i in range(len(bboxes)):
                 for j in range(4):
                     bboxes[i][j] = bboxes[i][j]*scale # 将同文件的其它结节相对于裁剪块的中心点坐标和直径也像裁剪的块一样缩放
-        return crop, target, bboxes, coord # 返回1*128*128*128的图块、第idx个结节坐标（相对于图块）和直径、同文件内其它结节的坐标（相对于图块）和直径、对于当前图块需要生成的所有anchor的中心坐标（相对于原图）
-    
+        return crop, target, bboxes, coord  # 返回1*128*128*128的图块、第idx个结节坐标（相对于图块）和直径、同文件内其它结节的坐标（相对于图块）和直径、对于当前图块需要生成的所有anchor的中心坐标（相对于原图）
+
+
 class LabelMapping(object):
     def __init__(self, config, phase):
         self.stride = np.array(config['stride']) # =4
@@ -282,9 +284,8 @@ class LabelMapping(object):
             self.th_pos = config['th_pos_train'] # =0.5
         elif phase == 'val':
             self.th_pos = config['th_pos_val'] # =1
-
             
-    def __call__(self, input_size, target, bboxes): # 该函数返回当前图块的标签，标签形状为[32,32,32,3,5]。注意，在这32*32*32*3个anchor中，只有一个被记为正例，反例最多为800个，剩下的anchor不参与损失函数的计算
+    def __call__(self, input_size, target, bboxes):  # 该函数返回当前图块的标签，标签形状为[32,32,32,3,5]。注意，在这32*32*32*3个anchor中，只有一个被记为正例，反例最多为800个，剩下的anchor不参与损失函数的计算
         stride = self.stride
         num_neg = self.num_neg
         th_neg = self.th_neg
