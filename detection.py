@@ -132,11 +132,11 @@ def main():
     #     num_workers=args.workers,
     #     pin_memory=True)
 
-    optimizer = torch.optim.SGD(
-        net.parameters(),
-        args.lr,
-        momentum=0.9,
-        weight_decay=args.weight_decay)
+    # optimizer = torch.optim.SGD(
+    #     net.parameters(),
+    #     args.lr,
+    #     momentum=0.9,
+    #     weight_decay=args.weight_decay)
     
     def get_lr(epoch):
         if epoch <= args.epochs * 0.5:
@@ -188,9 +188,19 @@ def main():
     #
     #     test(test_loader, net, get_pbb, save_dir, config)
     #     return
+    def weights_init(m):
+        classname = m.__class__.__name__
+        if classname.find('Conv') != -1:
+            m.weight.data.normal_(0.0, 0.02)
+        elif classname.find('BatchNorm') != -1:
+            m.weight.data.normal_(1.0, 0.02)
+            m.bias.data.fill_(0)
+        elif classname.find('Linear') != -1:
+            m.bias.data.fill_(0)
 
     # TODO: Cross-Validation with file_ids
     for k_fold in range(10):
+        print "Authorizing fold: {:d}".format(k_fold)
 
         # Loading training set
         dataset = data.DataBowl3Detector(
@@ -218,11 +228,22 @@ def main():
             num_workers=args.workers,
             pin_memory=True)
 
+        optimizer = torch.optim.SGD(
+            net.parameters(),
+            args.lr,
+            momentum=0.9,
+            weight_decay=args.weight_decay)
+
         # Training process
         train_loss_l, validate_loss_l = [], []
         train_tpr_l, validate_tpr_l = [], []
+
+        # weights initialize
+        net.apply(weights_init)
+
         for epoch in range(start_epoch, args.epochs + 1):
-            train_loss, train_tpr = train(train_loader, net, loss, epoch, optimizer, get_lr, args.save_freq, save_dir)
+            train_loss, train_tpr = train(train_loader, net, loss, epoch, optimizer, get_lr, args.save_freq,
+                                          os.path.join(save_dir, 'fold{:d}'.format(k_fold)))
             validate_loss, validate_tpr = validate(val_loader, net, loss)
 
             # Append loss results
