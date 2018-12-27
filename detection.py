@@ -153,7 +153,7 @@ def main():
         train_loss_l.append(train_loss)
         validate_loss_l.append(validate_loss)
         train_tpr_l.append(train_tpr)
-        validate_loss_l.append(validate_tpr)
+        validate_tpr_l.append(validate_tpr)
     # Save Train-loss and Validate-Loss
     if not os.path.exists('./train-vali-results'):
         os.mkdir('./train-vali-results')
