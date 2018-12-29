@@ -289,7 +289,6 @@ def main():
             if not os.path.exists(os.path.join(save_dir, 'fold{:d}'.format(k_fold))):
                 os.makedirs(os.path.join(save_dir, 'fold{:d}'.format(k_fold)))
             test(test_loader, net, get_pbb, os.path.join(save_dir, 'fold{:d}'.format(k_fold)), config)
-            return
 
 
 def train(data_loader, net, loss, epoch, optimizer, get_lr, save_freq, save_dir):
