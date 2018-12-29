@@ -2,7 +2,7 @@ import numpy as np
 import os
 np.random.seed(114514)
 
-k_fold = 5
+k_fold = 3
 
 file_id = np.asarray(['{:0>3}'.format(i) for i in range(888)])
 file_index = np.asarray([i % k_fold for i in range(888)])
@@ -22,8 +22,8 @@ np.save('./luna_file_id/file_id_unlabel.npy', unlabel_file_id)
 
 
 for k in range(k_fold):
-    test_file_id = file_id[file_index == k]
-    train_file_id = file_id[file_index != k]
+    test_file_id = label_file_id[file_index == k]
+    train_file_id = label_file_id[file_index != k]
 
     total_train_samples = int(0.4 * len(train_file_id))
     total_train_file_id = train_file_id[:total_train_samples]

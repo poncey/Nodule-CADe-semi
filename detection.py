@@ -96,7 +96,7 @@ def main():
         sys.stdout = Logger(logfile)
         pyfiles = [f for f in os.listdir('./') if f.endswith('.py')]
         for f in pyfiles:
-            shutil.copy(f, os.path.join(save_dir,f))
+            shutil.copy(f, os.path.join(save_dir, f))
     n_gpu = setgpu(args.gpu)
     args.n_gpu = n_gpu
     net = net.cuda()
@@ -104,39 +104,9 @@ def main():
     cudnn.benchmark = True
     net = DataParallel(net)
     datadir = config_detector['preprocess_result_path']
-    print 'datadir = ',datadir
+    print 'datadir = ', datadir
 
     net = DataParallel(net, device_ids=[0])
-    
-    # dataset = data.DataBowl3Detector(
-    #     datadir,
-    #     'detector/luna_file_id/file_id_train.npy',
-    #     config,
-    #     phase='train')
-    # train_loader = DataLoader(
-    #     dataset,
-    #     batch_size=args.batch_size,
-    #     shuffle=True,
-    #     num_workers=args.workers,
-    #     pin_memory=True)
-    #
-    # dataset = data.DataBowl3Detector(
-    #     datadir,
-    #     'detector/luna_file_id/file_id_val.npy',
-    #     config,
-    #     phase='val')
-    # val_loader = DataLoader(
-    #     dataset,
-    #     batch_size=args.batch_size,
-    #     shuffle=False,
-    #     num_workers=args.workers,
-    #     pin_memory=True)
-
-    # optimizer = torch.optim.SGD(
-    #     net.parameters(),
-    #     args.lr,
-    #     momentum=0.9,
-    #     weight_decay=args.weight_decay)
     
     def get_lr(epoch):
         if epoch <= args.epochs * 0.5:
@@ -147,47 +117,6 @@ def main():
             lr = 0.01 * args.lr
         return lr
 
-    # # Training and Validation approach
-    # train_loss_l, validate_loss_l = [], []
-    # train_tpr_l, validate_tpr_l = [], []
-    # for epoch in range(start_epoch, args.epochs + 1):
-    #     train_loss, train_tpr = train(train_loader, net, loss, epoch, optimizer, get_lr, args.save_freq, save_dir)
-    #     validate_loss, validate_tpr = validate(val_loader, net, loss)
-    #     train_loss_l.append(train_loss)
-    #     validate_loss_l.append(validate_loss)
-    #     train_tpr_l.append(train_tpr)
-    #     validate_tpr_l.append(validate_tpr)
-    # # Save Train-loss and Validate-Loss
-    # if not os.path.exists('./train-vali-results'):
-    #     os.mkdir('./train-vali-results')
-    # np.save('./train-vali-results/train-loss.npy', np.asarray(train_loss_l).astype(np.float64))
-    # np.save('./train-vali-results/validation-loss.npy', np.asarray(validate_loss_l).astype(np.float64))
-    # np.save('./train-vali-results/train-tpr.npy', np.asarray(train_tpr_l).astype(np.float64))
-    # np.save('./train-vali-results/validation-tpr.npy', np.asarray(validate_tpr_l).astype(np.float64))
-    # print "Finished saving training results"
-    #
-    # # test process
-    # if args.test == 1:
-    #     margin = 32
-    #     sidelen = 144
-    #
-    #     split_comber = SplitComb(sidelen, config['max_stride'], config['stride'], margin, config['pad_value'])
-    #     dataset = data.DataBowl3Detector(
-    #         datadir,
-    #         'detector/luna_file_id/file_id_test.npy',
-    #         config,
-    #         phase='test',
-    #         split_comber=split_comber)
-    #     test_loader = DataLoader(
-    #         dataset,
-    #         batch_size=1,  # 在测试阶段，batch size 固定为1
-    #         shuffle=False,
-    #         num_workers=args.workers,
-    #         collate_fn=data.collate,
-    #         pin_memory=False)
-    #
-    #     test(test_loader, net, get_pbb, save_dir, config)
-    #     return
     def weights_init(m):
         classname = m.__class__.__name__
         if classname.find('Conv') != -1:
@@ -198,33 +127,21 @@ def main():
         elif classname.find('Linear') != -1:
             m.bias.data.fill_(0)
 
-    # TODO: Cross-Validation with file_ids
-    for k_fold in range(10):
+    # Cross-Validation of 3D-semi, train
+    for k_fold in range(5):
         print "Authorizing fold: {:d}".format(k_fold)
 
         # Loading training set
         dataset = data.DataBowl3Detector(
             datadir,
-            'detector/luna_file_id/subset_{:d}'.format(k_fold) + '/file_id_train.npy',
+            'detector/luna_file_id/subset_fold{:d}'.format(k_fold) + '/file_id_rpn_train.npy',
             config,
             phase='train'
         )
-        train_loader = DataLoader(
+        rpn_train_loader = DataLoader(
             dataset,
             batch_size=args.batch_size,
             shuffle=True,
-            num_workers=args.workers,
-            pin_memory=True)
-        # Loading validation set
-        dataset = data.DataBowl3Detector(
-            datadir,
-            'detector/luna_file_id/subset_{:d}'.format(k_fold) + '/file_id_val.npy',
-            config,
-            phase='val')
-        val_loader = DataLoader(
-            dataset,
-            batch_size=args.batch_size,
-            shuffle=False,
             num_workers=args.workers,
             pin_memory=True)
 
@@ -235,8 +152,7 @@ def main():
             weight_decay=args.weight_decay)
 
         # Training process
-        train_loss_l, validate_loss_l = [], []
-        train_tpr_l, validate_tpr_l = [], []
+        train_loss_l, train_tpr_l = [], []
 
         # weights initialize
         net.apply(weights_init)
@@ -244,27 +160,20 @@ def main():
         for epoch in range(start_epoch, args.epochs + 1):
             if not os.path.exists(os.path.join(save_dir, 'fold{:d}'.format(k_fold))):
                 os.makedirs(os.path.join(save_dir, 'fold{:d}'.format(k_fold)))
-            train_loss, train_tpr = train(train_loader, net, loss, epoch, optimizer, get_lr, args.save_freq,
+            train_loss, train_tpr = train(rpn_train_loader, net, loss, epoch, optimizer, get_lr, args.save_freq,
                                           os.path.join(save_dir, 'fold{:d}'.format(k_fold)))
-            validate_loss, validate_tpr = validate(val_loader, net, loss)
 
             # Append loss results
             train_loss_l.append(train_loss)
-            validate_loss_l.append(validate_loss)
             train_tpr_l.append(train_tpr)
-            validate_tpr_l.append(validate_tpr)
 
         # Save Train-Validation results
         if not os.path.exists('./train-vali-results/fold{:d}'.format(k_fold)):
             os.makedirs('./train-vali-results/fold{:d}'.format(k_fold))
-        np.save('./train-vali-results/fold{:d}'.format(k_fold) + '/train-loss.npy',
+        np.save('./train-vali-results/fold{:d}'.format(k_fold) + '/rpn-train-loss.npy',
                 np.asarray(train_loss_l).astype(np.float64))
-        np.save('./train-vali-results/fold{:d}'.format(k_fold) + '/validation-loss.npy',
-                np.asarray(validate_loss_l).astype(np.float64))
-        np.save('./train-vali-results/fold{:d}'.format(k_fold) + '/train-tpr.npy',
+        np.save('./train-vali-results/fold{:d}'.format(k_fold) + '/rpn-train-tpr.npy',
                 np.asarray(train_tpr_l).astype(np.float64))
-        np.save('./train-vali-results/fold{:d}'.format(k_fold) + '/validation-tpr.npy',
-                np.asarray(validate_tpr_l).astype(np.float64))
 
         # Testing process
         if args.test == 1:
@@ -274,7 +183,7 @@ def main():
             split_comber = SplitComb(sidelen, config['max_stride'], config['stride'], margin, config['pad_value'])
             dataset = data.DataBowl3Detector(
                 datadir,
-                'detector/luna_file_id/subset_{:d}'.format(k_fold) + '/file_id_test.npy',
+                'detector/luna_file_id/subset_fold{:d}'.format(k_fold) + '/file_id_test.npy',
                 config,
                 phase='test',
                 split_comber=split_comber)
@@ -286,9 +195,52 @@ def main():
                 collate_fn=data.collate,
                 pin_memory=False)
 
-            if not os.path.exists(os.path.join(save_dir, 'fold{:d}'.format(k_fold))):
-                os.makedirs(os.path.join(save_dir, 'fold{:d}'.format(k_fold)))
-            test(test_loader, net, get_pbb, os.path.join(save_dir, 'fold{:d}'.format(k_fold)), config)
+            split_comber = SplitComb(sidelen, config['max_stride'], config['stride'], margin, config['pad_value'])
+            dataset = data.DataBowl3Detector(
+                datadir,
+                'detector/luna_file_id/subset_fold{:d}'.format(k_fold) + '/file_id_total_train.npy',
+                config,
+                phase='test',
+                split_comber=split_comber)
+
+            train_total_loader = DataLoader(
+                dataset,
+                batch_size=1,  # 在测试阶段，batch size 固定为1
+                shuffle=False,
+                num_workers=args.workers,
+                collate_fn=data.collate,
+                pin_memory=False)
+
+            split_comber = SplitComb(sidelen, config['max_stride'], config['stride'], margin, config['pad_value'])
+            dataset = data.DataBowl3Detector(
+                datadir,
+                'detector/luna_file_id/file_id_unlabel.npy',
+                config,
+                phase='test',
+                split_comber=split_comber)
+
+            unlabel_loader = DataLoader(
+                dataset,
+                batch_size=1,  # 在测试阶段，batch size 固定为1
+                shuffle=False,
+                num_workers=args.workers,
+                collate_fn=data.collate,
+                pin_memory=False)
+
+            test_dir = os.path.join(save_dir, 'voi_fold{:d}'.format(k_fold), 'test')
+            if not os.path.exists(test_dir):
+                os.makedirs(test_dir)
+            find_voi(test_loader, net, get_pbb, test_dir, config)
+
+            total_train_dir = os.path.join(save_dir, 'voi_fold{:d}'.format(k_fold), 'total_train')
+            if not os.path.exists(total_train_dir):
+                os.makedirs(total_train_dir)
+            find_voi(train_total_loader, net, get_pbb, total_train_dir, config)
+
+            unlabel_dir = os.path.join(save_dir, 'voi_fold{:d}'.format(k_fold), 'unlabel')
+            if not os.path.exists(unlabel_dir):
+                os.makedirs(unlabel_dir)
+            find_voi(unlabel_loader, net, get_pbb, unlabel_dir, config)
 
 
 def train(data_loader, net, loss, epoch, optimizer, get_lr, save_freq, save_dir):
@@ -393,7 +345,7 @@ def validate(data_loader, net, loss):
     return np.mean(metrics[:, 0]), tpr  # Return total loss of single epoch
 
 
-def test(data_loader, net, get_pbb, save_dir, config):
+def find_voi(data_loader, net, get_pbb, save_dir, config):
     start_time = time.time()
     save_dir = os.path.join(save_dir, 'bbox')  # detector/results/res18/bbox
     if not os.path.exists(save_dir):
@@ -420,7 +372,7 @@ def test(data_loader, net, get_pbb, save_dir, config):
         # print 'isfeat = ',isfeat
         n_per_run = args.n_test  # 测试时的gpu数量
         print('data.size = ', data.size())
-        splitlist = range(0, len(data)+1,n_per_run)
+        splitlist = range(0, len(data)+1, n_per_run)
         if splitlist[-1] != len(data):
             splitlist.append(len(data))
         outputlist = []
