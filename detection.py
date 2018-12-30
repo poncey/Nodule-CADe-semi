@@ -128,7 +128,7 @@ def main():
             m.bias.data.fill_(0)
 
     # Cross-Validation of 3D-semi, train
-    for k_fold in range(5):
+    for k_fold in range(3):
         print "Authorizing fold: {:d}".format(k_fold)
 
         # Loading training set
