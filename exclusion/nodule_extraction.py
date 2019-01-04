@@ -9,22 +9,23 @@ def extract_nodule(lung_image, centre, size=(64, 64, 64)):
     size = np.asarray(size, dtype=np.int16)
     size_up = size // 2  # Cut as the length start from the centre
     size_down = size - size_up
+    centre = np.asarray(centre, dtype=np.int16)
 
     # padding width (0-th dimension)
     pad_up = np.zeros((size_up[0], lung_image.shape[1], lung_image.shape[2]))
-    pad_down = np.zeros(size_down[0], lung_image.shape[1], lung_image.shape[2])
+    pad_down = np.zeros((size_down[0], lung_image.shape[1], lung_image.shape[2]))
     lung_image = np.concatenate((pad_up, lung_image), axis=0)
     lung_image = np.concatenate((lung_image, pad_down), axis=0)
 
     # padding length (1-th dimension)
-    pad_up = np.zeros(lung_image.shape[0], size_up[1], lung_image.shape[2])
-    pad_down = np.zeros(lung_image.shape[0], size_down[1], lung_image.shape[2])
+    pad_up = np.zeros((lung_image.shape[0], size_up[1], lung_image.shape[2]))
+    pad_down = np.zeros((lung_image.shape[0], size_down[1], lung_image.shape[2]))
     lung_image = np.concatenate((pad_up, lung_image), axis=1)
     lung_image = np.concatenate((lung_image, pad_down), axis=1)
 
     # padding height (2-th dimension)
-    pad_up = np.zeros(lung_image.shape[0], lung_image.shape[1], size_up[2])
-    pad_down = np.zeros(lung_image.shape[0], lung_image.shape[1], size_down[2])
+    pad_up = np.zeros((lung_image.shape[0], lung_image.shape[1], size_up[2]))
+    pad_down = np.zeros((lung_image.shape[0], lung_image.shape[1], size_down[2]))
     lung_image = np.concatenate((pad_up, lung_image), axis=2)
     lung_image = np.concatenate((lung_image, pad_down), axis=2)
 
@@ -50,4 +51,5 @@ def save_3d_image(image, name):
     direction = 'saving-imgs'
     if not os.path.exists(direction):
         os.makedirs(direction)
-    cv2.imwrite(os.path.join(dir, name, '.jpg'), image)
+    name = name + '.jpg'
+    cv2.imwrite(os.path.join(dir, name), image)

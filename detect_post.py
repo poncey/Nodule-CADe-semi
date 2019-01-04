@@ -227,7 +227,7 @@ for f in file_list:
 shorter = np.array(pandas.read_csv('/home/user/work/DataBowl3/DSB2017-master/training/detector/labels/shorter.csv',header=None))
 
 
-all_df = pandas.read_csv('my_submission.csv')
+#all_df = pandas.read_csv('my_submission.csv')
 
 #id_list = ['026','066','276','325','559','608','756','830']
 #np.set_printoptions(precision=3)
@@ -239,8 +239,9 @@ missed_nodule = 0
 total_pbb = 0
 true_positive = 0
 false_positive = 0
-csvFile=open("detect_post/fold0_test.csv", "wb") 
+csvFile=open("detect_post/test.csv", "wb") 
 writer =csv.writer(csvFile)
+writer.writerow(["index","x","y","z","d","p","label"])
 for file_id in id_list:
     print 'processing ',file_id
     #读取bbox
@@ -255,7 +256,7 @@ for file_id in id_list:
     
     pbb[:,0]=sigmoid(pbb[:,0]) # 因为网络输出的时候没有计算sigmoid，因此在这里要对pbb的置信分数做sigmoid计算
    
-    pbb = pbb_th(pbb,0.5)
+    pbb = pbb_th(pbb,0.8)
     print lbb.shape[0],'lbbs, ',pbb.shape[0],' pbbs'
 
     pbb=nms(pbb,0.125)
@@ -311,8 +312,8 @@ for file_id in id_list:
     pbb=pbb_diam
     pbb[:,:4]=np.around(pbb[:,:4],decimals=2)
     pbb[:,4]=np.around(pbb[:,4],decimals=4)
-    xx,yy=np.where(shorter==int(file_id))
-    seriesuid=shorter[xx[0]][-1]
+    #xx,yy=np.where(shorter==int(file_id))
+    #seriesuid=shorter[xx[0]][-1]
     
     assert len(flag_pbb)==len(pbb)
     
@@ -320,7 +321,7 @@ for file_id in id_list:
     
     i=[]
     if pbb is not None:
-        print file_id,seriesuid
+        print file_id       #,seriesuid
         if lbb.shape[0]!=0:
             print 'lbb:'
             for jjj in range(len(lbb)):
@@ -328,7 +329,7 @@ for file_id in id_list:
         print 'pbb:'
         for iii in range(len(pbb)):
             print pbb[iii],flag_pbb[iii]
-            i=[seriesuid,pbb[iii][0],pbb[iii][1],pbb[iii][2],pbb[iii][3],pbb[iii][4],flag_pbb[iii]]
+            i=[file_id,pbb[iii][0],pbb[iii][1],pbb[iii][2],pbb[iii][3],pbb[iii][4],flag_pbb[iii]]
             writer.writerow(i)
             
         #print world_coord
