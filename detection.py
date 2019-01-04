@@ -53,7 +53,7 @@ parser.add_argument('--n_test', default=1, type=int, metavar='N',
 parser.add_argument('--fold', required=True, type=int, metavar='N',
                     help='Training data in fold: k')
 
-cuda_device = "0, 1, 2, 3"
+cuda_device = "0"
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"] = cuda_device
 
