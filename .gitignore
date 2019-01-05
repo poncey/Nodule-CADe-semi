@@ -3,6 +3,8 @@ classifier/
 detector/results
 detector/luna_file_id
 detector/labels
+exclusion/saving-imgs
+exclusion/fig.py
 .flag*
 .idea
 

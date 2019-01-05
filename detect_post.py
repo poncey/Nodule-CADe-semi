@@ -218,7 +218,7 @@ def save_result_as_cvs(file_id,seriesuid,world_coord):
 
 #file_list=['026', '066', '276', '325', '559', '608', '756', '830'] # 这是测试结果的文件id和本地电脑的mhd id的交集（因为我要读取mhd中的origin和肺部分割文件的lung_box[:0]）
 
-file_list = glob('/home/user/wuyunheng/DSB2017-master/training/results/res18/voifold0/test/bbox/*pbb.npy')
+file_list = glob('/home/user/wuyunheng/DSB2017-master/training/results/res18/voifold2/test/bbox/*pbb.npy')
 id_list=[]
 #print len(file_list)
 for f in file_list:
@@ -239,15 +239,15 @@ missed_nodule = 0
 total_pbb = 0
 true_positive = 0
 false_positive = 0
-csvFile=open("detect_post/test.csv", "wb") 
+csvFile=open("detect_post/fig.csv", "wb") 
 writer =csv.writer(csvFile)
-writer.writerow(["index","x","y","z","d","p","label"])
+writer.writerow(["index","x","y","z","d","p"])
 for file_id in id_list:
     print 'processing ',file_id
     #读取bbox
     #bbox_voxel_coord = np.load('/home/jx/work/DataBowl3/data/luna/preprocessed_luna_data/'+file_id+'_label.npy')
-    lbb_name='/home/user/wuyunheng/DSB2017-master/training/results/res18/voifold0/test/bbox/'+file_id+'_lbb.npy'
-    pbb_name='/home/user/wuyunheng/DSB2017-master/training/results/res18/voifold0/test/bbox/'+file_id+'_pbb.npy'
+    lbb_name='/home/user/wuyunheng/DSB2017-master/training/results/res18/voifold2/test/bbox/'+file_id+'_lbb.npy'
+    pbb_name='/home/user/wuyunheng/DSB2017-master/training/results/res18/voifold2/test/bbox/'+file_id+'_pbb.npy'
     
     lbb=np.load(lbb_name)
     total_nodule += lbb.shape[0]
@@ -329,7 +329,7 @@ for file_id in id_list:
         print 'pbb:'
         for iii in range(len(pbb)):
             print pbb[iii],flag_pbb[iii]
-            i=[file_id,pbb[iii][0],pbb[iii][1],pbb[iii][2],pbb[iii][3],pbb[iii][4],flag_pbb[iii]]
+            i=[file_id,pbb[iii][0],pbb[iii][1],pbb[iii][2],pbb[iii][3],pbb[iii][4]]
             writer.writerow(i)
             
         #print world_coord

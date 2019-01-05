@@ -1,3 +1,4 @@
+# -*- coding:UTF-8 -*-
 import numpy as np
 import os
 import cv2
@@ -10,6 +11,10 @@ def extract_nodule(lung_image, centre, size=(64, 64, 64)):
     size_up = size // 2  # Cut as the length start from the centre
     size_down = size - size_up
     centre = np.asarray(centre, dtype=np.int16)
+    
+    if len(lung_image.shape) == 4:
+        assert lung_image.shape[0] == 1
+        lung_image = lung_image.reshape(lung_image.shape[1], lung_image.shape[2], lung_image.shape[3])
 
     # padding width (0-th dimension)
     pad_up = np.zeros((size_up[0], lung_image.shape[1], lung_image.shape[2]))
@@ -44,7 +49,7 @@ def extract_nodule(lung_image, centre, size=(64, 64, 64)):
     if True in (np.asarray(nodule_image.shape) != size):
         raise Exception('Nodule shape is not right.')
 
-    return nodule_image
+    return nodule_image.reshape(1, nodule_image.shape[0], nodule_image.shape[1], nodule_image.shape[2])
 
 
 def save_3d_image(image, name):
@@ -52,4 +57,7 @@ def save_3d_image(image, name):
     if not os.path.exists(direction):
         os.makedirs(direction)
     name = name + '.jpg'
-    cv2.imwrite(os.path.join(dir, name), image)
+    cv2.imwrite(os.path.join(direction, name), image)
+
+
+
