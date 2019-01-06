@@ -5,6 +5,7 @@ import cv2
 from pandas import read_csv
 import torch
 from torch.utils.data import Dataset
+from tqdm import tqdm
 
 
 class ExclusionDataset(Dataset):
@@ -13,6 +14,7 @@ class ExclusionDataset(Dataset):
         self.lung_dir = lung_dir
         self.phase = phase
         self.fold = fold
+        self.shorter_list = read_csv(os.path.join(index_dir, 'shorter.csv'))
 
         if phase == 'test':
             self.index_list = read_csv(os.path.join(index_dir, 'fold%d' % fold, 'test.csv'))
@@ -36,12 +38,23 @@ class ExclusionDataset(Dataset):
         nodule_image = extract_nodule(lung_img, centre, size=[64, 64, 64])
 
         # Obtain the label
-        if self.phase != 'unlabeled':
+        if self.phase != 'train':
+            # get label
             if not self.index_list['label'][idx]:
                 label = 0
             else:
                 label = 1
             return nodule_image, label
+        elif self.phase == 'test':
+            # get label
+            if not self.index_list['label'][idx]:
+                label = 0
+            else:
+                label = 1
+            # name list for shorter File-ids
+            xx , yy = np.where(self.shorter_list == self.index_list['index'][idx])
+            series_uid = self.shorter_list[xx[0]][-1]
+            return nodule_image, label, series_uid, centre
         else:
             return nodule_image
 
@@ -80,8 +93,8 @@ def extract_nodule(lung_image, centre, size):
     lung_image = np.concatenate((lung_image, pad_down), axis=2)
 
     centre += size_up
-    print "shape after padding: ", lung_image.shape
-    print "centre of nodule after padding: ", centre
+    # print "shape after padding: ", lung_image.shape
+    # print "centre of nodule after padding: ", centre
 
     # Extraction
     nodule_image = lung_image[
@@ -103,54 +116,50 @@ def save_3d_image(image, name):
         os.makedirs(direction)
     name = name + '.jpg'
     cv2.imwrite(os.path.join(direction, name), image)
-    
-'''
-
-direction1 = '/home/user/work/DataBowl3/DSB2017-master/training/'
-filepath = os.path.join(direction1,'fold',fold,'/')
 
 
-def data_loader(fold,val):
-    if val=='test':
-        name1 = val + '.csv'
-        data = os.path.join(direction1,name1)
-        with open(data) as csvfile:
-            reader = pd.read_csv(csvfile)
-            sample_number =0;
-            for row in reader:
-                index=reader.loc([[row],['index']])
-                (x,y,z) = reader.loc([[row],['x','y','z']])
-                label = reader.loc([[row],['label']])
-                lung=np.load(index+'_clean.npy')
-                nodule_64=extract_nodule(lung,(x,y,z),(64,64,64))
-                channel = nodule[:, :, :, 32].reshape(64,64)
-                save_3d_image(nodule[:, :, :, 32].reshape(64,64),index+row)
-                sample_number+=1
-    else if val == 'total_train':
-        name = val + '.csv'
-        with open(name) as csvfile:
-            reader = pd.read_csv(csvfile)
-            sample_number =0;
-            for row in reader:
-                index=reader.loc([[row],['index']])
-                (x,y,z) = reader.loc([[row],['x','y','z']])
-                lung=np.load(index+'_clean.npy')
-                nodule_64=extract_nodule(lung,(x,y,z),(64,64,64))
-                save_3d_image(nodule[:, :, :, 32].reshape(64,64),'index'+row)
-                sample_number+=1
-    else if val == 'unlabel':
-        name = val + '.csv'
-        with open(name) as csvfile:
-            reader = pd.read_csv(csvfile)
-            sample_number =0;
-            for row in reader:
-                index=reader.loc([[row],['index']])
-                (x,y,z) = reader.loc([[row],['x','y','z']])
-                lung=np.load(index+'_clean.npy')
-                nodule_64=extract_nodule(lung,(x,y,z),(64,64,64))
-                save_3d_image(nodule[:, :, :, 32].reshape(64,64),'index'+row)
-                sample_number +=1
-    else raise Exception('Wrong val type,please check!')
-    
-    return tensor_32(sample_number,channel,label)
-'''
+def load_data(dataset):
+
+    print "Loading %s dataset, with size: %d" % (dataset.phase, len(dataset))
+    if dataset.phase == 'train':
+        images = [], labels = []
+        for i in tqdm(range(len(dataset))):
+            image = dataset[i][0]
+            image = np.expand_dims(image, axis=0)
+            images.append(image)
+
+            labels.append(dataset[i][1])
+        images = np.concatenate(images, axis=0)
+        labels = np.asarray(labels, dtype=np.int)
+
+        return torch.from_numpy(images), torch.from_numpy(labels)
+
+    if dataset.phase == 'unlabeled':
+        images = []
+        for i in tqdm(range(len(dataset))):
+            image = dataset[i]
+            image = np.expand_dims(image, axis=0)
+            images.append(image)
+
+        images = np.concatenate(images, axis=0)
+        return torch.from_numpy(images)
+
+    if dataset.phase == 'test':
+        images = []
+        labels = []
+        file_ids = []
+        centers = []
+
+        for i in tqdm(range(len(dataset))):
+            image = dataset[i][0]
+            image = np.expand_dims(image, axis=0)
+            images.append(image)
+
+            labels.append(dataset[i][1])
+            file_ids.append(dataset[i][2])
+            centers.append(dataset[i][3])
+
+        images = np.concatenate(images, axis=0)
+        labels = np.asarray(labels, dtype=np.int)
+
+        return torch.from_numpy(images), torch.from_numpy(labels), file_ids, centers
