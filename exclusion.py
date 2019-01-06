@@ -115,7 +115,7 @@ def main():
     # TODO: Finish loading data
     X_train = torch.randn(400, 1, 64, 64, 64)
     _, y_train = torch.max(torch.randn(400, 2), dim=1)
-    X_ul = torch.randn(600, 1, 32, 32, 32)
+    X_ul = torch.randn(600, 1, 64, 64, 64)
 
     # parameters for training
     batch_size = args.batch_size
@@ -181,7 +181,7 @@ def main():
     torch.save({'save_dir': args.save_dir,
                 'state_dict': state_dict,
                 'args': args},
-               os.path.join(save_dir, 'fold%d' % args.fold, 'model.ckpt')
+               os.path.join(save_dir, 'model.ckpt')
                )
 
     # TODO: Finish the test set loading
