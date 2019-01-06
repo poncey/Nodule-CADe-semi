@@ -1,15 +1,10 @@
-import torch
 from torch.optim import Adam
 from torch.nn import DataParallel
 from exclusion.net import *
 from exclusion.utils import *
 import os
 import argparse
-import matplotlib.pyplot as plt
 import numpy as np
-import sklearn.metrics as metrics
-from sklearn.model_selection import StratifiedKFold
-from scipy import interp
 from tqdm import tqdm
 
 parser = argparse.ArgumentParser(description='False Positive Reduction in semi method')
@@ -161,12 +156,18 @@ def main():
                                                                             batch_size, replace=False))
                 ul_x_64 = X_ul[batch_indices_unlabeled]
                 ul_x_32 = extract_half(ul_x_64)
-                v_loss, ce_loss = train_semi(model.train(), x_32, x_64, y, ul_x_32, ul_x_64,
+                v_loss, ce_loss = train_semi(model.train(),
+                                             Variable(tocuda(x_32)), Variable(tocuda(x_64)),
+                                             Variable(tocuda(y)),
+                                             Variable(tocuda(ul_x_32)), Variable(tocuda(ul_x_64)),
                                              optimizer, criterion, epsilon=args.epsilon)
 
             # supervised with cross-entropy loss
             else:
-                sv_loss = train_supervise(model.train(), x_32, x_64, y, optimizer, criterion)
+                sv_loss = train_supervise(model.train(),
+                                          Variable(tocuda(x_32)), Variable(tocuda(x_64)),
+                                          Variable(tocuda(y)),
+                                          optimizer, criterion)
 
     # saving model
     print "saving model..."
@@ -194,3 +195,7 @@ def main():
     np.save(os.path.join(save_dir, 'pos_prob.npy'), pos_prob)
 
     print "Complete!"
+
+
+if __name__ == '__main__':
+    main()

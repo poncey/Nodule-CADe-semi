@@ -2,8 +2,28 @@
 import numpy as np
 import os
 import cv2
-import os,csv,pandas as pd
+import csv
 import torch
+from torch.utils.data import Dataset
+
+
+class ExculsionDataset(Dataset):
+    def __init__(self, data_dir, index_dir, fold, phase='train'):
+        assert(phase == 'train' or phase == 'unlabeled' or phase == 'test')
+        self.data_dir = data_dir
+        self.phase = phase
+        self.fold = fold
+        self.index_dir = index_dir
+
+        if phase == 'test':
+            load_dir = os.path.join(index_dir, 'fold%d' % fold, 'test.csv')
+        elif phase == 'unlabeled':
+            load_dir = os.path.join(index_dir, 'fold%d' % fold, 'unlabel.csv')
+        elif phase == 'train':
+            load_dir = os.path.join(index_dir, 'fold%d' % fold, 'total_train.csv')
+        else:
+            raise ValueError('Please check your phase.')
+
 
 def extract_nodule(lung_image, centre, size):
     if len(size) != 3:
