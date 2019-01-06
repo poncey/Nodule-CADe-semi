@@ -13,7 +13,7 @@ class ExclusionDataset(Dataset):
         self.lung_dir = lung_dir
         self.phase = phase
         self.fold = fold
-        self.shorter_list = read_csv(os.path.join(index_dir, 'shorter.csv'))
+        self.shorter_list = np.asarray(read_csv(os.path.join(index_dir, 'shorter.csv'), header=None))
 
         if phase == 'test':
             self.index_list = read_csv(os.path.join(index_dir, 'fold%d' % fold, 'test.csv'))
@@ -51,7 +51,7 @@ class ExclusionDataset(Dataset):
             else:
                 label = 1
             # name list for shorter File-ids
-            xx , yy = np.where(self.shorter_list == self.index_list['index'][idx])
+            xx, yy = np.where(self.shorter_list == self.index_list['index'][idx])
             series_uid = self.shorter_list[xx[0]][-1]
             return nodule_image, label, series_uid, centre
         else:
