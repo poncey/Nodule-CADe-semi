@@ -7,7 +7,7 @@ import torch
 from torch.utils.data import Dataset
 
 
-class ExculsionDataset(Dataset):
+class ExclusionDataset(Dataset):
     def __init__(self, lung_dir, index_dir, fold, phase='train'):
         assert(phase == 'train' or phase == 'unlabeled' or phase == 'test')
         self.lung_dir = lung_dir
@@ -41,9 +41,9 @@ class ExculsionDataset(Dataset):
                 label = 0
             else:
                 label = 1
-            return torch.from_numpy(nodule_image), torch.from_numpy(label)
+            return nodule_image, label
         else:
-            return torch.from_numpy(nodule_image)
+            return nodule_image
 
     def __len__(self):
         return len(self.index_list)
