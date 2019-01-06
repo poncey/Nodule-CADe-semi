@@ -2,32 +2,56 @@
 import numpy as np
 import os
 import cv2
-import csv
+from pandas import read_csv
 import torch
 from torch.utils.data import Dataset
 
 
 class ExculsionDataset(Dataset):
-    def __init__(self, data_dir, index_dir, fold, phase='train'):
+    def __init__(self, lung_dir, index_dir, fold, phase='train'):
         assert(phase == 'train' or phase == 'unlabeled' or phase == 'test')
-        self.data_dir = data_dir
+        self.lung_dir = lung_dir
         self.phase = phase
         self.fold = fold
-        self.index_dir = index_dir
 
         if phase == 'test':
-            load_dir = os.path.join(index_dir, 'fold%d' % fold, 'test.csv')
+            self.index_list = read_csv(os.path.join(index_dir, 'fold%d' % fold, 'test.csv'))
         elif phase == 'unlabeled':
-            load_dir = os.path.join(index_dir, 'fold%d' % fold, 'unlabel.csv')
+            self.index_list = read_csv(os.path.join(index_dir, 'fold%d' % fold, 'unlabel.csv'))
         elif phase == 'train':
-            load_dir = os.path.join(index_dir, 'fold%d' % fold, 'total_train.csv')
+            self.index_list = read_csv(os.path.join(index_dir, 'fold%d' % fold, 'total_train.csv'))
         else:
             raise ValueError('Please check your phase.')
+
+    def __getitem__(self, idx):
+
+        # Loading lung image
+        lung_file = '%03d_clean.npy' % self.index_list['index'][idx]
+        lung_img = np.load(os.path.join(self.lung_dir, lung_file))
+
+        # extract the of nodule
+        centre = (self.index_list['x'][idx],
+                  self.index_list['y'][idx],
+                  self.index_list['z'][idx])
+        nodule_image = extract_nodule(lung_img, centre, size=[64, 64, 64])
+
+        # Obtain the label
+        if self.phase != 'unlabeled':
+            if not self.index_list['label'][idx]:
+                label = 0
+            else:
+                label = 1
+            return torch.from_numpy(nodule_image), torch.from_numpy(label)
+        else:
+            return torch.from_numpy(nodule_image)
+
+    def __len__(self):
+        return len(self.index_list)
 
 
 def extract_nodule(lung_image, centre, size):
     if len(size) != 3:
-        raise Exception("Wrong shape of size, it should be 3-d vector")
+        raise Exception("Wrong shape of size, it should be single value or 3-d vector")
     size = np.asarray(size, dtype=np.int16)
     size_up = size // 2  # Cut as the length start from the centre
     size_down = size - size_up
