@@ -38,7 +38,7 @@ class ExclusionDataset(Dataset):
         nodule_image = extract_nodule(lung_img, centre, size=[64, 64, 64])
 
         # Obtain the label
-        if self.phase != 'train':
+        if self.phase == 'train':
             # get label
             if not self.index_list['label'][idx]:
                 label = 0
@@ -122,7 +122,8 @@ def load_data(dataset):
 
     print "Loading %s dataset, with size: %d" % (dataset.phase, len(dataset))
     if dataset.phase == 'train':
-        images = [], labels = []
+        images = []
+        labels = []
         for i in tqdm(range(len(dataset))):
             image = dataset[i][0]
             image = np.expand_dims(image, axis=0)
