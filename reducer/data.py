@@ -148,5 +148,5 @@ def load_data(dataset, batch_indices):
     if dataset.phase == 'test':
         assert type(batch_indices) == int
         image, label, file_id, centre = dataset[batch_indices]
-
+        image = np.expand_dims(image, axis=0)
         return torch.from_numpy(image), torch.from_numpy(np.asarray(label)), file_id, centre
