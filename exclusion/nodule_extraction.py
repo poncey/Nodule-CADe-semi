@@ -2,9 +2,10 @@
 import numpy as np
 import os
 import cv2
+import os,csv,pandas as pd
+import torch
 
-
-def extract_nodule(lung_image, centre, size=(64, 64, 64)):
+def extract_nodule(lung_image, centre, size):
     if len(size) != 3:
         raise Exception("Wrong shape of size, it should be 3-d vector")
     size = np.asarray(size, dtype=np.int16)
@@ -58,6 +59,54 @@ def save_3d_image(image, name):
         os.makedirs(direction)
     name = name + '.jpg'
     cv2.imwrite(os.path.join(direction, name), image)
+    
+'''
+
+direction1 = '/home/user/work/DataBowl3/DSB2017-master/training/'
+filepath = os.path.join(direction1,'fold',fold,'/')
 
 
-
+def data_loader(fold,val):
+    if val=='test':
+        name1 = val + '.csv'
+        data = os.path.join(direction1,name1)
+        with open(data) as csvfile:
+            reader = pd.read_csv(csvfile)
+            sample_number =0;
+            for row in reader:
+                index=reader.loc([[row],['index']])
+                (x,y,z) = reader.loc([[row],['x','y','z']])
+                label = reader.loc([[row],['label']])
+                lung=np.load(index+'_clean.npy')
+                nodule_64=extract_nodule(lung,(x,y,z),(64,64,64))
+                channel = nodule[:, :, :, 32].reshape(64,64)
+                save_3d_image(nodule[:, :, :, 32].reshape(64,64),index+row)
+                sample_number+=1
+    else if val == 'total_train':
+        name = val + '.csv'
+        with open(name) as csvfile:
+            reader = pd.read_csv(csvfile)
+            sample_number =0;
+            for row in reader:
+                index=reader.loc([[row],['index']])
+                (x,y,z) = reader.loc([[row],['x','y','z']])
+                lung=np.load(index+'_clean.npy')
+                nodule_64=extract_nodule(lung,(x,y,z),(64,64,64))
+                save_3d_image(nodule[:, :, :, 32].reshape(64,64),'index'+row)
+                sample_number+=1
+    else if val == 'unlabel':
+        name = val + '.csv'
+        with open(name) as csvfile:
+            reader = pd.read_csv(csvfile)
+            sample_number =0;
+            for row in reader:
+                index=reader.loc([[row],['index']])
+                (x,y,z) = reader.loc([[row],['x','y','z']])
+                lung=np.load(index+'_clean.npy')
+                nodule_64=extract_nodule(lung,(x,y,z),(64,64,64))
+                save_3d_image(nodule[:, :, :, 32].reshape(64,64),'index'+row)
+                sample_number +=1
+    else raise Exception('Wrong val type,please check!')
+    
+    return tensor_32(sample_number,channel,label)
+'''
