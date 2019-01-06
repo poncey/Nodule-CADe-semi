@@ -118,13 +118,12 @@ def save_3d_image(image, name):
     cv2.imwrite(os.path.join(direction, name), image)
 
 
-def load_data(dataset):
-
-    print "Loading %s dataset, with size: %d" % (dataset.phase, len(dataset))
+def load_data(dataset, batch_indices):
+    # TODO: fixed for batch_indices loading
     if dataset.phase == 'train':
         images = []
         labels = []
-        for i in tqdm(range(len(dataset))):
+        for i in batch_indices:
             image = dataset[i][0]
             image = np.expand_dims(image, axis=0)
             images.append(image)
@@ -137,7 +136,7 @@ def load_data(dataset):
 
     if dataset.phase == 'unlabeled':
         images = []
-        for i in tqdm(range(len(dataset))):
+        for i in batch_indices:
             image = dataset[i]
             image = np.expand_dims(image, axis=0)
             images.append(image)
@@ -151,7 +150,7 @@ def load_data(dataset):
         file_ids = []
         centers = []
 
-        for i in tqdm(range(len(dataset))):
+        for i in batch_indices:
             image = dataset[i][0]
             image = np.expand_dims(image, axis=0)
             images.append(image)
