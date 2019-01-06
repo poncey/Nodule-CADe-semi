@@ -149,4 +149,4 @@ def load_data(dataset, batch_indices):
         assert type(batch_indices) == int
         image, label, file_id, centre = dataset[batch_indices]
 
-        return torch.from_numpy(image), torch.from_numpy(label), file_id, centre
+        return torch.from_numpy(image), torch.from_numpy(np.asarray(label)), file_id, centre
