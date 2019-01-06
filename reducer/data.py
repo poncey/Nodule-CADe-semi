@@ -5,7 +5,6 @@ import cv2
 from pandas import read_csv
 import torch
 from torch.utils.data import Dataset
-from tqdm import tqdm
 
 
 class ExclusionDataset(Dataset):
@@ -119,8 +118,9 @@ def save_3d_image(image, name):
 
 
 def load_data(dataset, batch_indices):
-    # TODO: fixed for batch_indices loading
+
     if dataset.phase == 'train':
+        assert type(batch_indices) == np.ndarray
         images = []
         labels = []
         for i in batch_indices:
@@ -135,6 +135,7 @@ def load_data(dataset, batch_indices):
         return torch.from_numpy(images), torch.from_numpy(labels)
 
     if dataset.phase == 'unlabeled':
+        assert type(batch_indices) == np.ndarray
         images = []
         for i in batch_indices:
             image = dataset[i]
@@ -145,21 +146,7 @@ def load_data(dataset, batch_indices):
         return torch.from_numpy(images)
 
     if dataset.phase == 'test':
-        images = []
-        labels = []
-        file_ids = []
-        centers = []
+        assert type(batch_indices) == int
+        image, label, file_id, centre = dataset[batch_indices]
 
-        for i in batch_indices:
-            image = dataset[i][0]
-            image = np.expand_dims(image, axis=0)
-            images.append(image)
-
-            labels.append(dataset[i][1])
-            file_ids.append(dataset[i][2])
-            centers.append(dataset[i][3])
-
-        images = np.concatenate(images, axis=0)
-        labels = np.asarray(labels, dtype=np.int)
-
-        return torch.from_numpy(images), torch.from_numpy(labels), file_ids, centers
+        return torch.from_numpy(image), torch.from_numpy(label), file_id, centre

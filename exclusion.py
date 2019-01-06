@@ -1,11 +1,13 @@
 from torch.optim import Adam
 from torch.nn import DataParallel
-from exclusion.net import *
-from exclusion.utils import *
+from reducer.net import *
+from reducer.utils import *
+from reducer.data import ExclusionDataset, load_data
 import os
 import argparse
 import numpy as np
 from tqdm import tqdm
+from pandas import DataFrame
 
 parser = argparse.ArgumentParser(description='False Positive Reduction in semi method')
 parser.add_argument('-b', '--batch-size', default=16, type=int, metavar='N',
@@ -33,12 +35,14 @@ os.environ["CUDA_VISIBLE_DEVICES"] = cuda_device
 
 
 # Some parameters for training
+luna_dir = '/home/user/wuyunheng/work/DataBowl3/data/luna/preprocessed_luna_data'
+data_index_dir = 'reducer/detect_post'
 top_bn = True
 args = parser.parse_args()
 
 
 # Some functions for traning
-def tocuda(x, use_cuda=args.cuda):
+def to_cuda(x, use_cuda=args.cuda):
     if use_cuda:
         return x.cuda()
     return x
@@ -83,11 +87,18 @@ def train_supervise(model, x_s, x_l, y, optimizer, criterion):
     return loss
 
 
-def eval(model, x_s, x_l, y):
+def evaluate(model, x_s, x_l):
 
     y_pred = model(x_s, x_l)
-    score_pos = y_pred.cpu().detach().numpy()[:, 1]
-    return score_pos
+    if len(y_pred.size()) == 2:
+        score_pos = y_pred.cpu().detach().numpy()[:, 1]
+        return score_pos
+    elif len(y_pred.size()) == 1:
+        score_pos = y_pred.cpu().detach().numpy()[1]
+        return score_pos
+    else:
+        raise Exception('Wrong Shape of score_pos in evaluation')
+
 
 
 def weights_init(m):
@@ -106,26 +117,26 @@ def main():
     torch.manual_seed(114514)
     torch.cuda.manual_seed_all(114514)
 
-    model = tocuda(NetBasic(top_bn))
+    model = to_cuda(NetBasic(top_bn))
     model = DataParallel(model, device_ids=[0, 1, 2, 3])
     model.apply(weights_init)
     criterion = nn.CrossEntropyLoss()  # ce_loss
     optimizer = Adam(model.parameters(), lr=args.lr)
 
-    # TODO: Finish loading data
-    X_train = torch.randn(400, 1, 64, 64, 64)
-    _, y_train = torch.max(torch.randn(400, 2), dim=1)
-    X_ul = torch.randn(600, 1, 64, 64, 64)
+    train_dataset = ExclusionDataset(luna_dir, data_index_dir, fold=args.fold, phase='train')
+    unlabeled_dataset = ExclusionDataset(luna_dir, data_index_dir, fold=args.fold, phase='unlabeled')
 
     # parameters for training
     batch_size = args.batch_size
-    num_iter_per_epoch = (max(X_train.size()[0], X_ul.size()[0]) / batch_size) + 20
+    num_iter_per_epoch = (max(len(train_dataset), len(unlabeled_dataset)) / batch_size) + 30
 
     print "executing fold %d" % args.fold
+    print "Labeled training samples: %d" % len(train_dataset)
     if args.semi_spv == 0:
         print "supervised mission"
     else:
         print "semi-supervised mission"
+        print "Unlabeled training samples: %d" % len(unlabeled_dataset)
     print
     print
 
@@ -145,28 +156,26 @@ def main():
         print "contains %d iterations." % num_iter_per_epoch
         for i in tqdm(range(num_iter_per_epoch)):
             # training in batches
-            batch_indices = torch.LongTensor(np.random.choice(X_train.size()[0], batch_size, replace=False))
-            x_64 = X_train[batch_indices]
+            batch_indices = np.random.choice(len(train_dataset), batch_size, replace=False)
+            x_64, y = load_data(train_dataset, batch_indices)
             x_32 = extract_half(x_64)
-            y = y_train[batch_indices]
 
             # semi-supervised, we used same batch-size for both labeled and unlabeled
             if args.semi_spv == 1:
-                batch_indices_unlabeled = torch.LongTensor(np.random.choice(X_ul.size()[0],
-                                                                            batch_size, replace=False))
-                ul_x_64 = X_ul[batch_indices_unlabeled]
+                batch_indices_unlabeled = np.random.choice(len(unlabeled_dataset), batch_size, replace=False)
+                ul_x_64 = load_data(unlabeled_dataset, batch_indices_unlabeled)
                 ul_x_32 = extract_half(ul_x_64)
                 v_loss, ce_loss = train_semi(model.train(),
-                                             Variable(tocuda(x_32)), Variable(tocuda(x_64)),
-                                             Variable(tocuda(y)),
-                                             Variable(tocuda(ul_x_32)), Variable(tocuda(ul_x_64)),
+                                             Variable(to_cuda(x_32)), Variable(to_cuda(x_64)),
+                                             Variable(to_cuda(y)),
+                                             Variable(to_cuda(ul_x_32)), Variable(to_cuda(ul_x_64)),
                                              optimizer, criterion, epsilon=args.epsilon)
 
             # supervised with cross-entropy loss
             else:
                 sv_loss = train_supervise(model.train(),
-                                          Variable(tocuda(x_32)), Variable(tocuda(x_64)),
-                                          Variable(tocuda(y)),
+                                          Variable(to_cuda(x_32)), Variable(to_cuda(x_64)),
+                                          Variable(to_cuda(y)),
                                           optimizer, criterion)
 
     # saving model
@@ -184,17 +193,40 @@ def main():
                os.path.join(save_dir, 'model.ckpt')
                )
 
-    # TODO: Finish the test set loading
-    x_test_64 = torch.randn(350, 1, 64, 64, 64)
-    _, y_test = torch.max(torch.randn(350, 2), dim=1)
+    # Generating test results one by one
+    print "Testing step..."
+    test_dataset = ExclusionDataset(luna_dir, data_index_dir, fold=args.fold, phase='test')
+    print "Testing samples: %d" % len(test_dataset)
 
-    x_test_32 = extract_half(x_test_64)
-    # evaluation: output the positive probability
-    print "generating evaluation results..."
-    pos_prob = eval(model.eval(), Variable(x_test_32), Variable(x_test_64), y_test)
-    np.save(os.path.join(save_dir, 'pos_prob.npy'), pos_prob)
+    series_uid_list = []
+    coord_x_list = []
+    coord_y_list = []
+    coord_z_list = []
+    probabilities_list = []
+    for i in tqdm(range(len(test_dataset))):
+        test_image_64, test_label, series_uid, centre_coordinate = test_dataset[i]
+        test_image_32 = extract_half(test_image_64)
 
-    print "Complete!"
+        # Get predicted probability
+        prob_pos = eval(model.eval(), test_image_64, test_image_32)  # hint: test_label unused
+
+        # Arrange all items for saving
+        series_uid_list.append(series_uid)
+        coord_x_list.append(centre_coordinate[0])
+        coord_y_list.append(centre_coordinate[1])
+        coord_z_list.append(centre_coordinate[2])
+        probabilities_list.append(prob_pos)
+
+    print "Finished evaluation step, generating evaluation files.."
+    # Saving results
+    data_frame = DataFrame({
+        'seriesuid': series_uid_list,
+        'coordX': coord_x_list,
+        'coordY': coord_y_list,
+        'coordZ': coord_z_list,
+        'probability': probabilities_list
+    })
+    data_frame.to_csv(os.path.join(save_dir, 'results.csv'), index=True, sep=',')
 
 
 if __name__ == '__main__':
