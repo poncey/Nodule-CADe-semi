@@ -142,7 +142,8 @@ def main():
         print "Unlabeled training samples: %d" % len(unlabeled_dataset)
     print
     print
-
+    ce_loss_list = []
+    vat_loss_list = []
     for epoch in range(args.epochs):
         print "epoch: %d" % (epoch + 1)
 
@@ -155,7 +156,6 @@ def main():
             decayed_lr = ((args.epochs - epoch) * (0.1 * args.lr)) / (args.epochs - (0.8 * args.epochs))
         optimizer.lr = decayed_lr
         optimizer.betas = (0.5, 0.999)
-
         print "contains %d iterations." % num_iter_per_epoch
         for i in tqdm(range(num_iter_per_epoch)):
             # training in batches
@@ -176,6 +176,10 @@ def main():
                                              Variable(to_cuda(y)),
                                              Variable(to_cuda(ul_x_32)), Variable(to_cuda(ul_x_64)),
                                              optimizer, criterion, epsilon=args.epsilon)
+                if i == num_iter_per_epoch - 1:
+                    print "epoch %d: " % epoch + 1, "vat_loss: ", v_loss, "ce_loss: ", ce_loss
+                    ce_loss_list.append(ce_loss)
+                    vat_loss_list.append(v_loss)
 
             # supervised with cross-entropy loss
             else:
@@ -183,14 +187,19 @@ def main():
                                           Variable(to_cuda(x_32)), Variable(to_cuda(x_64)),
                                           Variable(to_cuda(y)),
                                           optimizer, criterion)
+                if i == num_iter_per_epoch - 1:
+                    print "epoch %d: " % epoch + 1, "sv_loss", sv_loss
+                    ce_loss_list.append(sv_loss)
 
     # saving model
     print "saving model..."
     state_dict = model.module.state_dict()
     for key in state_dict.keys():
         state_dict[key] = state_dict[key].cpu()
-
-    save_dir = os.path.join(args.save_dir, 'fold%d' % args.fold)
+    if args.semi_spv == 1:
+        save_dir = os.path.join(args.save_dir, 'fold%d' % args.fold, 'semi_spv')
+    else:
+        save_dir = os.path.join(args.save_dir, 'fold%d' % args.fold, 'supervise')
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     torch.save({'save_dir': args.save_dir,
@@ -199,6 +208,16 @@ def main():
                os.path.join(save_dir, 'model.ckpt')
                )
 
+    # Saving loss results
+    print "Saving loss results"
+    if args.semi_spv == 1:
+        ce_loss_list = np.asarray(ce_loss_list)
+        vat_loss_list = np.asarray(vat_loss_list)
+        np.save(os.path.join(save_dir, 'vat_loss.npy'), vat_loss_list)
+        np.save(os.path.join(save_dir, 'ce_loss.npy'), ce_loss_list)
+    else:
+        ce_loss_list = np.asarray(ce_loss_list)
+        np.save(os.path.join(save_dir, 'sv_loss.npy'), ce_loss_list)
     # Generating test results one by one
     print "Testing step..."
     # TODO: Verify it for import the entire dataset
@@ -226,7 +245,7 @@ def main():
         'coordZ': coord_z_list,
         'probability': probability_list
     })
-    data_frame.to_csv(os.path.join(save_dir, 'results.csv'), index=True, sep=',')
+    data_frame.to_csv(os.path.join(save_dir, 'eval_results.csv'), index=True, sep=',')
 
 
 if __name__ == '__main__':
