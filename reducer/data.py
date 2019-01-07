@@ -71,24 +71,24 @@ def extract_nodule(lung_image, centre):
         lung_image = lung_image.reshape(lung_image.shape[1], lung_image.shape[2], lung_image.shape[3])
 
     # padding width (0-th dimension)
-    pad_up = np.zeros((32, lung_image.shape[1], lung_image.shape[2]))
-    pad_down = np.zeros((32, lung_image.shape[1], lung_image.shape[2]))
+    pad_up = np.zeros((128, lung_image.shape[1], lung_image.shape[2]))
+    pad_down = np.zeros((128, lung_image.shape[1], lung_image.shape[2]))
     lung_image = np.concatenate((pad_up, lung_image), axis=0)
     lung_image = np.concatenate((lung_image, pad_down), axis=0)
 
     # padding length (1-th dimension)
-    pad_up = np.zeros((lung_image.shape[0], 32, lung_image.shape[2]))
-    pad_down = np.zeros((lung_image.shape[0], 32, lung_image.shape[2]))
+    pad_up = np.zeros((lung_image.shape[0], 128, lung_image.shape[2]))
+    pad_down = np.zeros((lung_image.shape[0], 128, lung_image.shape[2]))
     lung_image = np.concatenate((pad_up, lung_image), axis=1)
     lung_image = np.concatenate((lung_image, pad_down), axis=1)
 
     # padding height (2-th dimension)
-    pad_up = np.zeros((lung_image.shape[0], lung_image.shape[1], 32))
-    pad_down = np.zeros((lung_image.shape[0], lung_image.shape[1], 32))
+    pad_up = np.zeros((lung_image.shape[0], lung_image.shape[1], 128))
+    pad_down = np.zeros((lung_image.shape[0], lung_image.shape[1], 128))
     lung_image = np.concatenate((pad_up, lung_image), axis=2)
     lung_image = np.concatenate((lung_image, pad_down), axis=2)
 
-    centre += 32
+    centre = centre + 128
     # print "shape after padding: ", lung_image.shape
     # print "centre of nodule after padding: ", centre
 
@@ -101,7 +101,7 @@ def extract_nodule(lung_image, centre):
 
     # Verification of result
     if True in (np.asarray(nodule_image.shape) != np.asarray((64, 64, 64))):
-        raise Exception('Nodule shape is not right.')
+        raise Exception('Nodule shape' + nodule_image.shape + ' is not right.')
 
     return nodule_image.reshape(1, nodule_image.shape[0], nodule_image.shape[1], nodule_image.shape[2])
 
@@ -121,10 +121,11 @@ def load_data(dataset, save_dir='./'):
     if dataset.phase == 'train':
 
         if not os.path.exists(save_dir):
-            print "save_directions are empty, saving training data..."
+            print "save_direction not exist, saving training data..."
+            os.makedirs(save_dir)
             # save training dataset
             for i in tqdm(range(len(dataset))):
-                image, label = dataset[i][0]
+                image, label = dataset[i]
                 image = np.expand_dims(image, axis=0)
                 np.save(os.path.join(save_dir, '%03d_image.npy' % i), image)  # save the image
                 np.save(os.path.join(save_dir, '%03d_label.npy' % i), label)  # save the label
@@ -149,6 +150,7 @@ def load_data(dataset, save_dir='./'):
 
         if not os.path.exists(save_dir):
             print "save_directions are empty, saving unlabeled data..."
+            os.makedirs(save_dir)
             # save unlabeled dataset
             for i in tqdm(range(len(dataset))):
                 image = dataset[i]
@@ -170,6 +172,7 @@ def load_data(dataset, save_dir='./'):
 
         if not os.path.exists(save_dir):
             print "save_directions are empty, saving testing data..."
+            os.makedirs(save_dir)
             # save test dataset
             for i in tqdm(range(len(dataset))):
                 image, label, series_uid, centre = dataset[i]
