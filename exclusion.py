@@ -224,18 +224,18 @@ def main():
     test_dataset = ExclusionDataset(luna_dir, data_index_dir, fold=args.fold, phase='test')
     print "Testing samples: %d" % len(test_dataset)
     X_test, y_test, uids, center = load_data(test_dataset, nodule_dir)
-    prob_pos = evaluate(model.eval(), X_test, extract_half(X_test))
     series_uid_list = []
     coord_x_list = []
     coord_y_list = []
     coord_z_list = []
     probability_list = []
     for i in tqdm(range(len(test_dataset))):
+        prob_pos = evaluate(model.eval(), X_test[i], extract_half(X_test[i]))
         series_uid_list.append(uids[i])
         coord_x_list.append(center[i][0])
         coord_y_list.append(center[i][1])
         coord_z_list.append(center[i][2])
-        probability_list.append(prob_pos[i])
+        probability_list.append(prob_pos)
     print "Finished evaluation step, generating evaluation files.."
     # Saving results
     data_frame = DataFrame({
