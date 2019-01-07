@@ -1,3 +1,4 @@
+import torch
 from torch.nn import DataParallel
 from torch.optim import Adam
 from reducer.net import *
@@ -40,6 +41,7 @@ data_index_dir = 'reducer/detect_post'
 nodule_dir = 'nodule-data'
 top_bn = True
 args = parser.parse_args()
+num_iter_per_epoch = 120
 
 
 # Some functions for traning
@@ -131,7 +133,6 @@ def main():
     X_ul = load_data(unlabeled_dataset, nodule_dir)
     # parameters for training
     batch_size = args.batch_size
-    num_iter_per_epoch = (max(len(train_dataset), len(unlabeled_dataset)) / batch_size) + 30
 
     print "executing fold %d" % args.fold
     print "Labeled training samples: %d" % len(train_dataset)
@@ -229,13 +230,15 @@ def main():
     coord_y_list = []
     coord_z_list = []
     probability_list = []
+    label_list = []
     for i in tqdm(range(len(test_dataset))):
-        prob_pos = evaluate(model.eval(), X_test[i], extract_half(X_test[i]))
+        prob_pos = evaluate(model.eval(), Variable(to_cuda(extract_half(X_test[[i]]))), Variable(to_cuda(X_test[[i]])))
         series_uid_list.append(uids[i])
         coord_x_list.append(center[i][0])
         coord_y_list.append(center[i][1])
         coord_z_list.append(center[i][2])
         probability_list.append(prob_pos)
+        label_list.append(y_test[i])
     print "Finished evaluation step, generating evaluation files.."
     # Saving results
     data_frame = DataFrame({
@@ -244,8 +247,9 @@ def main():
         'coordY': coord_y_list,
         'coordZ': coord_z_list,
         'probability': probability_list
+        'label': label_list
     })
-    data_frame.to_csv(os.path.join(save_dir, 'eval_results.csv'), index=True, sep=',')
+    data_frame.to_csv(os.path.join(save_dir, 'eval_results.csv'), index=False, sep=',')
 
 
 if __name__ == '__main__':
