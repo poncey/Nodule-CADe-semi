@@ -177,7 +177,7 @@ def main():
                                              Variable(to_cuda(ul_x_32)), Variable(to_cuda(ul_x_64)),
                                              optimizer, criterion, epsilon=args.epsilon)
                 if i == num_iter_per_epoch - 1:
-                    print "epoch %d: " % epoch + 1, "vat_loss: ", v_loss, "ce_loss: ", ce_loss
+                    print "epoch %d: " % (epoch + 1), "vat_loss: ", v_loss, "ce_loss: ", ce_loss
                     ce_loss_list.append(ce_loss)
                     vat_loss_list.append(v_loss)
 
@@ -188,7 +188,7 @@ def main():
                                           Variable(to_cuda(y)),
                                           optimizer, criterion)
                 if i == num_iter_per_epoch - 1:
-                    print "epoch %d: " % epoch + 1, "sv_loss", sv_loss
+                    print "epoch %d: " % (epoch + 1), "sv_loss", sv_loss
                     ce_loss_list.append(sv_loss)
 
     # saving model
