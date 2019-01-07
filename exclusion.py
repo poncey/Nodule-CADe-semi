@@ -218,7 +218,7 @@ def main():
         np.save(os.path.join(save_dir, 'sv_loss.npy'), ce_loss_list)
 
     # Generating test results one by one
-    print "Testing step..."
+    print "Evaluation step..."
     test_dataset = ExclusionDataset(luna_dir, data_index_dir, fold=args.fold, phase='test')
     print "Testing samples: %d" % len(test_dataset)
     X_test, y_test, uids, center = load_data(test_dataset, nodule_dir)
@@ -228,6 +228,7 @@ def main():
     coord_z_list = []
     probability_list = []
     label_list = []
+    print "Testing..."
     for i in tqdm(range(len(test_dataset))):
         prob_pos = evaluate(model.eval(), Variable(to_cuda(extract_half(X_test[[i]]))), Variable(to_cuda(X_test[[i]])))
         series_uid_list.append(uids[i])
