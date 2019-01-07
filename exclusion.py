@@ -125,7 +125,6 @@ def main():
     criterion = nn.CrossEntropyLoss()  # ce_loss
     optimizer = Adam(model.parameters(), lr=args.lr)
 
-    # TODO: Verify it for import the entire dataset
     # import dataset
     train_dataset = ExclusionDataset(luna_dir, data_index_dir, fold=args.fold, phase='train')
     X_train, y_train = load_data(train_dataset, nodule_dir)
@@ -160,7 +159,6 @@ def main():
         print "contains %d iterations." % num_iter_per_epoch
         for i in tqdm(range(num_iter_per_epoch)):
             # training in batches
-            # TODO: Verify it for import the entire dataset
             batch_indices = torch.LongTensor(np.random.choice(len(train_dataset), batch_size, replace=False))
             x_64 = X_train[batch_indices]
             y = y_train[batch_indices]
@@ -169,7 +167,6 @@ def main():
             # semi-supervised, we used same batch-size for both labeled and unlabeled
             if args.semi_spv == 1:
                 batch_indices_unlabeled = torch.LongTensor(np.random.choice(len(unlabeled_dataset), batch_size, replace=False))
-                # TODO: Verify it for import the entire dataset
                 ul_x_64 = X_ul[batch_indices_unlabeled]
                 ul_x_32 = extract_half(ul_x_64)
                 v_loss, ce_loss = train_semi(model.train(),
@@ -219,9 +216,9 @@ def main():
     else:
         ce_loss_list = np.asarray(ce_loss_list)
         np.save(os.path.join(save_dir, 'sv_loss.npy'), ce_loss_list)
+
     # Generating test results one by one
     print "Testing step..."
-    # TODO: Verify it for import the entire dataset
     test_dataset = ExclusionDataset(luna_dir, data_index_dir, fold=args.fold, phase='test')
     print "Testing samples: %d" % len(test_dataset)
     X_test, y_test, uids, center = load_data(test_dataset, nodule_dir)
@@ -246,7 +243,7 @@ def main():
         'coordX': coord_x_list,
         'coordY': coord_y_list,
         'coordZ': coord_z_list,
-        'probability': probability_list
+        'probability': probability_list,
         'label': label_list
     })
     data_frame.to_csv(os.path.join(save_dir, 'eval_results.csv'), index=False, sep=',')
