@@ -5,6 +5,7 @@ import cv2
 from pandas import read_csv
 import torch
 from torch.utils.data import Dataset
+from tqdm import tqdm
 
 
 class ExclusionDataset(Dataset):
@@ -34,7 +35,7 @@ class ExclusionDataset(Dataset):
         centre = (self.index_list['x'][idx],
                   self.index_list['y'][idx],
                   self.index_list['z'][idx])
-        nodule_image = extract_nodule(lung_img, centre, size=[64, 64, 64])
+        nodule_image = extract_nodule(lung_img, centre)
 
         # Obtain the label
         if self.phase == 'train':
@@ -61,12 +62,8 @@ class ExclusionDataset(Dataset):
         return len(self.index_list)
 
 
-def extract_nodule(lung_image, centre, size):
-    if len(size) != 3:
-        raise Exception("Wrong shape of size, it should be single value or 3-d vector")
-    size = np.asarray(size, dtype=np.int16)
-    size_up = size // 2  # Cut as the length start from the centre
-    size_down = size - size_up
+def extract_nodule(lung_image, centre):
+    # Extract 64 * 64 * 64 nodules
     centre = np.asarray(centre, dtype=np.int16)
     
     if len(lung_image.shape) == 4:
@@ -74,36 +71,36 @@ def extract_nodule(lung_image, centre, size):
         lung_image = lung_image.reshape(lung_image.shape[1], lung_image.shape[2], lung_image.shape[3])
 
     # padding width (0-th dimension)
-    pad_up = np.zeros((size_up[0], lung_image.shape[1], lung_image.shape[2]))
-    pad_down = np.zeros((size_down[0], lung_image.shape[1], lung_image.shape[2]))
+    pad_up = np.zeros((32, lung_image.shape[1], lung_image.shape[2]))
+    pad_down = np.zeros((32, lung_image.shape[1], lung_image.shape[2]))
     lung_image = np.concatenate((pad_up, lung_image), axis=0)
     lung_image = np.concatenate((lung_image, pad_down), axis=0)
 
     # padding length (1-th dimension)
-    pad_up = np.zeros((lung_image.shape[0], size_up[1], lung_image.shape[2]))
-    pad_down = np.zeros((lung_image.shape[0], size_down[1], lung_image.shape[2]))
+    pad_up = np.zeros((lung_image.shape[0], 32, lung_image.shape[2]))
+    pad_down = np.zeros((lung_image.shape[0], 32, lung_image.shape[2]))
     lung_image = np.concatenate((pad_up, lung_image), axis=1)
     lung_image = np.concatenate((lung_image, pad_down), axis=1)
 
     # padding height (2-th dimension)
-    pad_up = np.zeros((lung_image.shape[0], lung_image.shape[1], size_up[2]))
-    pad_down = np.zeros((lung_image.shape[0], lung_image.shape[1], size_down[2]))
+    pad_up = np.zeros((lung_image.shape[0], lung_image.shape[1], 32))
+    pad_down = np.zeros((lung_image.shape[0], lung_image.shape[1], 32))
     lung_image = np.concatenate((pad_up, lung_image), axis=2)
     lung_image = np.concatenate((lung_image, pad_down), axis=2)
 
-    centre += size_up
+    centre += 32
     # print "shape after padding: ", lung_image.shape
     # print "centre of nodule after padding: ", centre
 
     # Extraction
     nodule_image = lung_image[
-        centre[0] - size_up[0]: centre[0] + size_down[0],
-        centre[1] - size_up[1]: centre[1] + size_down[1],
-        centre[2] - size_up[2]: centre[2] + size_down[2]
+        centre[0] - 32: centre[0] + 32,
+        centre[1] - 32: centre[1] + 32,
+        centre[2] - 32: centre[2] + 32
     ]
 
     # Verification of result
-    if True in (np.asarray(nodule_image.shape) != size):
+    if True in (np.asarray(nodule_image.shape) != np.asarray((64, 64, 64))):
         raise Exception('Nodule shape is not right.')
 
     return nodule_image.reshape(1, nodule_image.shape[0], nodule_image.shape[1], nodule_image.shape[2])
@@ -117,36 +114,96 @@ def save_3d_image(image, name):
     cv2.imwrite(os.path.join(direction, name), image)
 
 
-def load_data(dataset, batch_indices):
+# TODO: Verify it with import entire dataset
+def load_data(dataset, save_dir='./'):
 
+    save_dir = os.path.join(save_dir, 'fold%d' % dataset.fold, dataset.phase)
     if dataset.phase == 'train':
-        assert type(batch_indices) == np.ndarray
+
+        if not os.path.exists(save_dir):
+            print "save_directions are empty, saving training data..."
+            # save training dataset
+            for i in tqdm(range(len(dataset))):
+                image, label = dataset[i][0]
+                image = np.expand_dims(image, axis=0)
+                np.save(os.path.join(save_dir, '%03d_image.npy' % i), image)  # save the image
+                np.save(os.path.join(save_dir, '%03d_label.npy' % i), label)  # save the label
+            print "Generation of files completed, direction: %s" % save_dir
+            print
+
+        # generate data to memory
+        print "Move training data into memory..."
         images = []
         labels = []
-        for i in batch_indices:
-            image = dataset[i][0]
-            image = np.expand_dims(image, axis=0)
+        for i in tqdm(range(len(dataset))):
+            image = np.load(os.path.join(save_dir, '%03d_image.npy' % i))
+            label = np.load(os.path.join(save_dir, '%03d_label.npy' % i))
             images.append(image)
-
-            labels.append(dataset[i][1])
+            labels.append(label)
         images = np.concatenate(images, axis=0)
-        labels = np.asarray(labels, dtype=np.int)
-
-        return torch.from_numpy(images), torch.from_numpy(labels)
+        labels = np.asarray(labels)
+        assert images.shape[0] == len(dataset)
+        return torch.Tensor(images), torch.LongTensor(labels)
 
     if dataset.phase == 'unlabeled':
-        assert type(batch_indices) == np.ndarray
-        images = []
-        for i in batch_indices:
-            image = dataset[i]
-            image = np.expand_dims(image, axis=0)
-            images.append(image)
 
+        if not os.path.exists(save_dir):
+            print "save_directions are empty, saving unlabeled data..."
+            # save unlabeled dataset
+            for i in tqdm(range(len(dataset))):
+                image = dataset[i]
+                image = np.expand_dims(image, axis=0)
+                np.save(os.path.join(save_dir, '%03d_image.npy' % i), image)  # save the image
+            print "Generation of files completed, direction: %s" % save_dir
+            print
+
+        print "Move unlabeled data into memory..."
+        images = []
+        for i in tqdm(range(len(dataset))):
+            image = np.load(os.path.join(save_dir, '%03d_image.npy' % i))
+            images.append(image)
         images = np.concatenate(images, axis=0)
-        return torch.from_numpy(images)
+        assert images.shape[0] == len(dataset)
+        return torch.Tensor(images)
 
     if dataset.phase == 'test':
-        assert type(batch_indices) == int
-        image, label, file_id, centre = dataset[batch_indices]
-        image = np.expand_dims(image, axis=0)
-        return torch.from_numpy(image), torch.from_numpy(np.asarray(label)), file_id, centre
+
+        if not os.path.exists(save_dir):
+            print "save_directions are empty, saving testing data..."
+            # save test dataset
+            for i in tqdm(range(len(dataset))):
+                image, label, series_uid, centre = dataset[i]
+                image = np.expand_dims(image, axis=0)
+                np.save(os.path.join(save_dir, '%03d_image.npy' % i), image)
+                np.save(os.path.join(save_dir, '%03d_label.npy' % i), label)
+                np.save(os.path.join(save_dir, '%03d_uid.npy' % i), series_uid)
+                np.save(os.path.join(save_dir, '%03d_centre.npy' % i), centre)
+
+            print "Generation of files completed, direction: %s" % save_dir
+            print
+
+        print "Move test data into memory..."
+        images = []
+        labels = []
+        uids = []
+        centres = []
+        for i in tqdm(range(len(dataset))):
+            image = np.load(os.path.join(save_dir, '%03d_image.npy' % i))
+            images.append(image)
+
+            label = np.load(os.path.join(save_dir, '%03d_label.npy' % i))
+            labels.append(label)
+
+            series_uid = np.load(os.path.join(save_dir, '%03d_uid.npy' % i))
+            uids.append(series_uid)
+
+            centre = np.load(os.path.join(save_dir, '%03d_centre.npy' % i))
+            centre = centre.reshape(1, 3)
+            centres.append(centre)
+        images = np.concatenate(images, axis=0)
+        labels = np.asarray(labels)
+        uids = np.asarray(uids)
+        centres = np.concatenate(centres, axis=0)
+        return torch.Tensor(images), torch.LongTensor(labels), uids, centres
+
+

@@ -1,5 +1,6 @@
-from torch.optim import Adam
+import torch
 from torch.nn import DataParallel
+from torch.optim import Adam
 from reducer.net import *
 from reducer.utils import *
 from reducer.data import ExclusionDataset, load_data
@@ -37,6 +38,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = cuda_device
 # Some parameters for training
 luna_dir = '/home/user/wuyunheng/work/DataBowl3/data/luna/preprocessed_luna_data'
 data_index_dir = 'reducer/detect_post'
+nodule_dir = 'nodule-data'
 top_bn = True
 args = parser.parse_args()
 
@@ -100,7 +102,6 @@ def evaluate(model, x_s, x_l):
         raise Exception('Wrong Shape of score_pos in evaluation')
 
 
-
 def weights_init(m):
     classname = m.__class__.__name__
     if classname.find('Conv') != -1:
@@ -123,9 +124,12 @@ def main():
     criterion = nn.CrossEntropyLoss()  # ce_loss
     optimizer = Adam(model.parameters(), lr=args.lr)
 
+    # TODO: Verify it for import the entire dataset
+    # import dataset
     train_dataset = ExclusionDataset(luna_dir, data_index_dir, fold=args.fold, phase='train')
+    X_train, y_train = load_data(train_dataset, nodule_dir)
     unlabeled_dataset = ExclusionDataset(luna_dir, data_index_dir, fold=args.fold, phase='unlabeled')
-
+    X_ul = load_data(unlabeled_dataset, nodule_dir)
     # parameters for training
     batch_size = args.batch_size
     num_iter_per_epoch = (max(len(train_dataset), len(unlabeled_dataset)) / batch_size) + 30
@@ -156,14 +160,17 @@ def main():
         print "contains %d iterations." % num_iter_per_epoch
         for i in tqdm(range(num_iter_per_epoch)):
             # training in batches
-            batch_indices = np.random.choice(len(train_dataset), batch_size, replace=False)
-            x_64, y = load_data(train_dataset, batch_indices)
+            # TODO: Verify it for import the entire dataset
+            batch_indices = torch.LongTensor(np.random.choice(len(train_dataset), batch_size, replace=False))
+            x_64 = X_train[batch_indices]
+            y = y_train[batch_indices]
             x_32 = extract_half(x_64)
 
             # semi-supervised, we used same batch-size for both labeled and unlabeled
             if args.semi_spv == 1:
-                batch_indices_unlabeled = np.random.choice(len(unlabeled_dataset), batch_size, replace=False)
-                ul_x_64 = load_data(unlabeled_dataset, batch_indices_unlabeled)
+                batch_indices_unlabeled = torch.LongTensor(np.random.choice(len(unlabeled_dataset), batch_size, replace=False))
+                # TODO: Verify it for import the entire dataset
+                ul_x_64 = X_ul[batch_indices_unlabeled]
                 ul_x_32 = extract_half(ul_x_64)
                 v_loss, ce_loss = train_semi(model.train(),
                                              Variable(to_cuda(x_32)), Variable(to_cuda(x_64)),
@@ -195,28 +202,22 @@ def main():
 
     # Generating test results one by one
     print "Testing step..."
+    # TODO: Verify it for import the entire dataset
     test_dataset = ExclusionDataset(luna_dir, data_index_dir, fold=args.fold, phase='test')
     print "Testing samples: %d" % len(test_dataset)
-
+    X_test, y_test, uids, center = load_data(test_dataset, nodule_dir)
+    prob_pos = evaluate(model.eval(), X_test, extract_half(X_test))
     series_uid_list = []
     coord_x_list = []
     coord_y_list = []
     coord_z_list = []
-    probabilities_list = []
+    probability_list = []
     for i in tqdm(range(len(test_dataset))):
-        test_image_64, test_label, series_uid, centre_coordinate = test_dataset[i]
-        test_image_32 = extract_half(test_image_64)
-
-        # Get predicted probability
-        prob_pos = eval(model.eval(), test_image_64, test_image_32)  # hint: test_label unused
-
-        # Arrange all items for saving
-        series_uid_list.append(series_uid)
-        coord_x_list.append(centre_coordinate[0])
-        coord_y_list.append(centre_coordinate[1])
-        coord_z_list.append(centre_coordinate[2])
-        probabilities_list.append(prob_pos)
-
+        series_uid_list.append(uids[i])
+        coord_x_list.append(center[i][0])
+        coord_y_list.append(center[i][1])
+        coord_z_list.append(center[i][2])
+        probability_list.append(prob_pos[i])
     print "Finished evaluation step, generating evaluation files.."
     # Saving results
     data_frame = DataFrame({
@@ -224,7 +225,7 @@ def main():
         'coordX': coord_x_list,
         'coordY': coord_y_list,
         'coordZ': coord_z_list,
-        'probability': probabilities_list
+        'probability': probability_list
     })
     data_frame.to_csv(os.path.join(save_dir, 'results.csv'), index=True, sep=',')
 
