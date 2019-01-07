@@ -114,7 +114,6 @@ def save_3d_image(image, name):
     cv2.imwrite(os.path.join(direction, name), image)
 
 
-# TODO: Verify it with import entire dataset
 def load_data(dataset, save_dir='./'):
 
     save_dir = os.path.join(save_dir, 'fold%d' % dataset.fold, dataset.phase)

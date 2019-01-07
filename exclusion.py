@@ -1,4 +1,3 @@
-import torch
 from torch.nn import DataParallel
 from torch.optim import Adam
 from reducer.net import *
