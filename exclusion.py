@@ -209,12 +209,12 @@ def main():
     # Saving loss results
     print "Saving loss results"
     if args.semi_spv == 1:
-        ce_loss_list = np.asarray(ce_loss_list)
-        vat_loss_list = np.asarray(vat_loss_list)
+        ce_loss_list = np.asarray(ce_loss_list, dtype=np.float64)
+        vat_loss_list = np.asarray(vat_loss_list, dtype=np.float64)
         np.save(os.path.join(save_dir, 'vat_loss.npy'), vat_loss_list)
         np.save(os.path.join(save_dir, 'ce_loss.npy'), ce_loss_list)
     else:
-        ce_loss_list = np.asarray(ce_loss_list)
+        ce_loss_list = np.asarray(ce_loss_list, dtype=np.float64)
         np.save(os.path.join(save_dir, 'sv_loss.npy'), ce_loss_list)
 
     # Generating test results one by one
