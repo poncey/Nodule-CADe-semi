@@ -18,7 +18,7 @@ class NetBasic(nn.Module):
             # 32 * 32 * 32 * 1
             nn.Conv3d(1, 32, 5),
             nn.BatchNorm3d(32),
-            nn.LeakyReLU(),
+            nn.ReLU(),
 
             # 28 * 28 * 28 * 32
             nn.MaxPool3d((2, 2, 2)),
@@ -27,7 +27,7 @@ class NetBasic(nn.Module):
             # 14 * 14 * 14 * 32
             nn.Conv3d(32, 64, 5),
             nn.BatchNorm3d(64),
-            nn.LeakyReLU(),
+            nn.ReLU(),
 
             # 10 * 10 * 10 * 64
             nn.MaxPool3d((2, 2, 2)),
@@ -36,12 +36,13 @@ class NetBasic(nn.Module):
             # 5 * 5 * 5 * 64
             nn.Conv3d(64, 128, 5),
             nn.BatchNorm3d(128),
-            nn.LeakyReLU()
+            nn.ReLU()
 
             # 1 * 1 * 1 * 128
         )
         # final flatten layer for each input
-        self.fc = nn.Linear(256, 2)
+        self.fc1 = nn.Linear(256, 128)
+        self.fc2 = nn.Linear(128, 2)
         self.bn = nn.BatchNorm1d(2)
 
     def forward(self, input_s, input_l):
@@ -56,7 +57,8 @@ class NetBasic(nn.Module):
 
         # concat two paths
         x = torch.cat((x1.view(-1, 128), x2.view(-1, 128)), dim=1)
-        x = self.fc(x)
+        x = self.fc1(F.relu(x))
+        x = self.fc2(F.relu(x))
 
         if self.top_bn:
             x = self.bn(x)

@@ -19,6 +19,8 @@ parser.add_argument('--lr', '--learning-rate', default=0.01, type=float,
                     metavar='LR', help='initial learning rate')
 parser.add_argument('--epsilon', type=float, default=2.5, required=True,
                     help='epsilon for VAT')
+parser.add_argument('--lamb', default=10, required=True, type=float,
+                    help='lambda of combined loss')
 parser.add_argument('--test', default=1, type=int, metavar='SPLIT', choices=[0, 1],
                     help='1 do test evaluation, 0 not')
 parser.add_argument('--cuda', default=True, type=bool,
@@ -41,7 +43,7 @@ data_index_dir = 'reducer/detect_post'
 nodule_dir = 'nodule-data'
 top_bn = True
 args = parser.parse_args()
-num_iter_per_epoch = 200
+num_iter_per_epoch = 100
 
 
 # Some functions for traning
@@ -62,13 +64,14 @@ def extract_half(x_large):
     return x_small
 
 
-def train_semi(model, x_s, x_l, y, ul_x_s, ul_x_l, optimizer, criterion, epsilon):
+def train_semi(model, x_s, x_l, y, ul_x_s, ul_x_l, optimizer, criterion, epsilon, lamb):
 
     y_pred = model(x_s, x_l)
     ce_loss = criterion(y_pred, y)
 
     ul_y = model(ul_x_s, ul_x_l)
     v_loss = vat_loss(model, ul_x_s, ul_x_l, ul_y, eps=epsilon)
+    v_loss = v_loss * lamb  # Lambda for adjusting loss
     loss = v_loss + ce_loss
 
     optimizer.zero_grad()
@@ -96,7 +99,7 @@ def evaluate(model, x_s, x_l):
     if len(y_pred.size()) == 2:
         score_pos = y_pred.cpu().detach().numpy()[:, 1]
         score_neg = y_pred.cpu().detach().numpy()[:, 0]
-        return score_pos
+        return score_neg, score_pos
     elif len(y_pred.size()) == 1:
         score_pos = y_pred.cpu().detach().numpy()[1]
         score_neg = y_pred.cpu().detach().numpy()[0]
@@ -175,7 +178,7 @@ def main():
                                              Variable(to_cuda(x_32)), Variable(to_cuda(x_64)),
                                              Variable(to_cuda(y)),
                                              Variable(to_cuda(ul_x_32)), Variable(to_cuda(ul_x_64)),
-                                             optimizer, criterion, epsilon=args.epsilon)
+                                             optimizer, criterion, epsilon=args.epsilon, lamb=args.lamb)
                 if i == num_iter_per_epoch - 1:
                     print "epoch %d: " % (epoch + 1), "vat_loss: ", v_loss, "ce_loss: ", ce_loss
                     ce_loss_list.append(ce_loss)
