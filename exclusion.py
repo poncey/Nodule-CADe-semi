@@ -41,7 +41,7 @@ data_index_dir = 'reducer/detect_post'
 nodule_dir = 'nodule-data'
 top_bn = True
 args = parser.parse_args()
-num_iter_per_epoch = 120
+num_iter_per_epoch = 200
 
 
 # Some functions for traning
@@ -95,10 +95,12 @@ def evaluate(model, x_s, x_l):
     y_pred = model(x_s, x_l)
     if len(y_pred.size()) == 2:
         score_pos = y_pred.cpu().detach().numpy()[:, 1]
+        score_neg = y_pred.cpu().detach().numpy()[:, 0]
         return score_pos
     elif len(y_pred.size()) == 1:
         score_pos = y_pred.cpu().detach().numpy()[1]
-        return score_pos
+        score_neg = y_pred.cpu().detach().numpy()[0]
+        return score_neg, score_pos
     else:
         raise Exception('Wrong Shape of score_pos in evaluation')
 
@@ -222,20 +224,23 @@ def main():
     test_dataset = ExclusionDataset(luna_dir, data_index_dir, fold=args.fold, phase='test')
     print "Testing samples: %d" % len(test_dataset)
     X_test, y_test, uids, center = load_data(test_dataset, nodule_dir)
+    y_test = y_test.numpy()
     series_uid_list = []
     coord_x_list = []
     coord_y_list = []
     coord_z_list = []
-    probability_list = []
+    proba_pos_list = []
+    proba_neg_list = []
     label_list = []
     print "Testing..."
     for i in tqdm(range(len(test_dataset))):
-        prob_pos = evaluate(model.eval(), Variable(to_cuda(extract_half(X_test[[i]]))), Variable(to_cuda(X_test[[i]])))
+        prob_neg, prob_pos = evaluate(model.eval(), Variable(to_cuda(extract_half(X_test[[i]]))), Variable(to_cuda(X_test[[i]])))
         series_uid_list.append(uids[i])
         coord_x_list.append(center[i][0])
         coord_y_list.append(center[i][1])
         coord_z_list.append(center[i][2])
-        probability_list.append(prob_pos)
+        proba_neg_list.append(prob_neg)
+        proba_pos_list.append(prob_pos)
         label_list.append(y_test[i])
     print "Finished evaluation step, generating evaluation files.."
     # Saving results
@@ -244,7 +249,8 @@ def main():
         'coordX': coord_x_list,
         'coordY': coord_y_list,
         'coordZ': coord_z_list,
-        'probability': probability_list,
+        'proba_neg': proba_neg_list,
+        'proba_pos': proba_pos_list,
         'label': label_list
     })
     data_frame.to_csv(os.path.join(save_dir, 'eval_results.csv'), index=False, sep=',')
