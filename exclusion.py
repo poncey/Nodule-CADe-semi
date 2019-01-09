@@ -40,12 +40,12 @@ os.environ["CUDA_VISIBLE_DEVICES"] = cuda_device
 
 
 # Some parameters for training
-luna_dir = '/home/user/wuyunheng/work/DataBowl3/data/luna/preprocessed_luna_data'
+luna_dir = '/home/user2/pang_yu_xuan/preprocessed_luna_data/'
 data_index_dir = 'reducer/detect_post'
 nodule_dir = 'nodule-data'
-top_bn = True
+top_softmax = True
 args = parser.parse_args()
-num_iter_per_epoch = 100
+num_iter_per_epoch = 80
 
 
 # Some functions for traning
@@ -140,7 +140,7 @@ def main():
     torch.manual_seed(114514)
     torch.cuda.manual_seed_all(114514)
 
-    model = to_cuda(NetBasic(top_bn))
+    model = to_cuda(NetBasic(top_softmax))
     model = DataParallel(model, device_ids=[0, 1, 2, 3])
     model.apply(weights_init)
     criterion = nn.CrossEntropyLoss()  # ce_loss

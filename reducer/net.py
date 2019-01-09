@@ -55,9 +55,9 @@ class NetBasic(nn.Module):
 
         # concat two paths
         x = torch.cat((x1.view(-1, 128), x2.view(-1, 128)), dim=1)
-        x = self.fcs(x)
+        x = self.fc(x)
 
         if self.top_softmax:
-            x = F.softmax(x)
+            x = F.softmax(x, dim=1)
 
         return x
