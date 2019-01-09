@@ -31,6 +31,8 @@ parser.add_argument('--semi-spv', type=int, default=0, choices=[0, 1],
                     help='1 do semi supervised classification, 0 not')
 parser.add_argument('--save-dir', default='', type=str, metavar='SAVE',
                     help='directory to save checkpoint and results (default: none)')
+parser.add_argument('--argument', default=1, type=int,
+                    help='do data augmentation with x more positive samples, 0 will not performed.')
 
 cuda_device = "0, 1, 2, 3"
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
@@ -62,6 +64,20 @@ def extract_half(x_large):
                       (centre[1] - centre[1] / 2): (centre[1] + centre[1] / 2),
                       (centre[2] - centre[2] / 2): (centre[2] + centre[2] / 2)]
     return x_small
+
+
+def argumentation(X_train, y_train, copies):
+    assert type(copies) == int
+    X_train = X_train.numpy()
+    y_train = y_train.numpy()
+
+    indicies = np.where(y_train == 1)
+
+    X_train = np.concatenate([X_train[indicies]] * copies + [X_train], axis=0)
+    y_train = np.concatenate([y_train[indicies]] * copies + [y_train], axis=0)
+    print "performed argumentation."
+    print "X_train Shape after %d multiple argumentation: " % copies, X_train.shape
+    return torch.Tensor(X_train), torch.LongTensor(y_train)
 
 
 def train_semi(model, x_s, x_l, y, ul_x_s, ul_x_l, optimizer, criterion, epsilon, lamb):
@@ -130,21 +146,25 @@ def main():
     criterion = nn.CrossEntropyLoss()  # ce_loss
     optimizer = Adam(model.parameters(), lr=args.lr)
 
+    print "executing fold %d" % args.fold
     # import dataset
+
     train_dataset = ExclusionDataset(luna_dir, data_index_dir, fold=args.fold, phase='train')
     X_train, y_train = load_data(train_dataset, nodule_dir)
     unlabeled_dataset = ExclusionDataset(luna_dir, data_index_dir, fold=args.fold, phase='unlabeled')
     X_ul = load_data(unlabeled_dataset, nodule_dir)
-    # parameters for training
-    batch_size = args.batch_size
-
-    print "executing fold %d" % args.fold
     print "Labeled training samples: %d" % len(train_dataset)
     if args.semi_spv == 0:
         print "supervised mission"
     else:
         print "semi-supervised mission"
         print "Unlabeled training samples: %d" % len(unlabeled_dataset)
+    # data argumentation
+    if args.argument != 0:
+        X_train, y_train = argumentation(X_train, y_train, args.argument)
+
+    # parameters for training
+    batch_size = args.batch_size
     print
     print
     ce_loss_list = []
